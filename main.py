@@ -167,6 +167,130 @@ def print_results(state: dict):
     console.print(f"\n[dim]Full results saved to {output_path}[/dim]")
 
 
+def print_perf_results(perf_result: dict):
+    """Pretty-print performance test results."""
+    if not perf_result:
+        return
+
+    console.print(Panel(
+        f"Endpoints Discovered: {perf_result.get('endpoints_discovered', 0)}\n"
+        f"Endpoints Tested: {perf_result.get('endpoints_tested', 0)}\n"
+        f"Test Runs: {len(perf_result.get('test_runs', []))}\n"
+        f"Bottlenecks Found: {len(perf_result.get('bottlenecks', []))}",
+        title="Performance Test Summary",
+        border_style="cyan",
+    ))
+
+    # Per-test-run tables
+    for run in perf_result.get("test_runs", []):
+        test_type = run.get("test_type", "").upper()
+        console.print(
+            f"\n[bold]{test_type} TEST[/bold] — "
+            f"{run.get('peak_users')} users | "
+            f"{run.get('duration_seconds')}s | "
+            f"{run.get('total_requests', 0):,} requests | "
+            f"Error rate: {run.get('overall_error_rate', 0):.1%} | "
+            f"RPS: {run.get('overall_rps', 0):.1f}"
+        )
+
+        metrics = run.get("endpoint_metrics", [])
+        if metrics:
+            perf_table = Table(title=f"{test_type} — Endpoint Metrics")
+            perf_table.add_column("Endpoint", style="cyan", max_width=50)
+            perf_table.add_column("Method", style="magenta")
+            perf_table.add_column("p50", justify="right")
+            perf_table.add_column("p90", justify="right")
+            perf_table.add_column("p99", justify="right")
+            perf_table.add_column("Err%", justify="right")
+            perf_table.add_column("RPS", justify="right")
+            perf_table.add_column("Bottleneck", style="red")
+
+            for m in metrics:
+                is_bn = "YES" if m.get("is_bottleneck") else "-"
+                perf_table.add_row(
+                    m.get("endpoint", "")[:50],
+                    m.get("method", ""),
+                    f"{m.get('p50_ms', 0):.0f}ms",
+                    f"{m.get('p90_ms', 0):.0f}ms",
+                    f"{m.get('p99_ms', 0):.0f}ms",
+                    f"{m.get('error_rate', 0):.1%}",
+                    f"{m.get('requests_per_second', 0):.1f}",
+                    is_bn,
+                )
+            console.print(perf_table)
+
+    # Bottlenecks
+    bottlenecks = perf_result.get("bottlenecks", [])
+    if bottlenecks:
+        bn_text = "\n".join(f"• {b}" for b in bottlenecks)
+        console.print(Panel(bn_text, title="Bottlenecks Detected", border_style="red"))
+
+    # AI Analysis
+    ai_analysis = perf_result.get("ai_analysis", "")
+    if ai_analysis:
+        console.print(Panel(ai_analysis, title="AI Performance Analysis", border_style="blue"))
+
+    # Recommendations
+    recommendations = perf_result.get("recommendations", [])
+    if recommendations:
+        rec_text = "\n".join(f"{i+1}. {r}" for i, r in enumerate(recommendations))
+        console.print(Panel(rec_text, title="Recommendations", border_style="green"))
+
+    # Script path
+    script_path = perf_result.get("generated_script_path", "")
+    if script_path:
+        console.print(f"\n[dim]Locust script saved to {script_path}[/dim]")
+
+
+def print_defect_results(defect_result: dict):
+    """Pretty-print Layer 5 defect detection results."""
+    if not defect_result:
+        return
+
+    reg_score = defect_result.get("max_regression_score", 0.0)
+    score_color = "red" if reg_score >= 40 else "yellow" if reg_score >= 10 else "green"
+
+    summary = (
+        f"Pages Analyzed: {defect_result.get('total_priority_pages', 0)}\n"
+        f"Total Defects: {defect_result.get('total_defects', 0)}\n"
+        f"  Critical: {defect_result.get('critical_count', 0)}\n"
+        f"  High:     {defect_result.get('high_count', 0)}\n"
+        f"  Medium:   {defect_result.get('medium_count', 0)}\n"
+        f"  Low:      {defect_result.get('low_count', 0)}\n"
+        f"  Info:     {defect_result.get('info_count', 0)}\n"
+        f"[{score_color}]Max Regression Score: {reg_score:.1f}/100[/{score_color}]"
+    )
+    console.print(Panel(summary, title="Defect Detection Summary", border_style=score_color))
+
+    # Per-page regression summary
+    pages = defect_result.get("pages_analyzed", [])
+    if pages:
+        tbl = Table(title="High-Priority Page Defects")
+        tbl.add_column("Page Type", style="magenta")
+        tbl.add_column("URL", style="cyan", max_width=50)
+        tbl.add_column("Priority", style="dim")
+        tbl.add_column("Critical", justify="right", style="red")
+        tbl.add_column("High", justify="right", style="yellow")
+        tbl.add_column("Regression Score", justify="right")
+
+        for p in pages:
+            comp = p.get("comparison") or {}
+            score = comp.get("regression_score", 0.0)
+            tbl.add_row(
+                p.get("page_type", "?").upper(),
+                p.get("url", "")[:50],
+                p.get("priority_reason", "")[:30],
+                str(p.get("critical_count", 0)),
+                str(p.get("high_count", 0)),
+                f"{score:.1f}",
+            )
+        console.print(tbl)
+
+    report_path = defect_result.get("report_path", "")
+    if report_path:
+        console.print(f"\n[dim]Defect report saved to {report_path}[/dim]")
+
+
 async def main():
     parser = argparse.ArgumentParser(description="ReQon Bug & Hygiene Discovery Engine")
     parser.add_argument("url", help="Target URL to scan")
@@ -177,6 +301,41 @@ async def main():
     parser.add_argument("--password", default=None)
     parser.add_argument("--token", default=None)
     parser.add_argument("--login-url", default=None)
+
+    # Performance testing flags (Layer 3)
+    parser.add_argument("--perf-test", action="store_true", default=True, help="Run performance tests after crawling")
+    # Defect detection flags (Layer 5)
+    parser.add_argument(
+        "--defect-detection",
+        action="store_true",
+        default=True,
+        help="Run visual defect detection in parallel with load testing (requires --perf-test)",
+    )
+    parser.add_argument(
+        "--defect-viewport",
+        default="1920x1080",
+        metavar="WxH",
+        help="Viewport size for defect capture, e.g. 1920x1080 (default: 1920x1080)",
+    )
+    parser.add_argument(
+        "--defect-max-pages",
+        type=int,
+        default=10,
+        help="Max high-priority pages to scan per defect detection run (default: 10)",
+    )
+    parser.add_argument(
+        "--test-type",
+        choices=["load", "stress", "soak", "all"],
+        default="all",
+        help="Performance test type(s) to run (default: all)",
+    )
+    parser.add_argument("--openapi-spec", default=None, help="Path or URL to Swagger/OpenAPI spec")
+    parser.add_argument("--load-users", type=int, default=10, help="Concurrent users for load test")
+    parser.add_argument("--load-duration", type=int, default=30, help="Load test duration in seconds")
+    parser.add_argument("--stress-users", type=int, default=50, help="Max users for stress test")
+    parser.add_argument("--stress-duration", type=int, default=60, help="Stress test duration in seconds")
+    parser.add_argument("--soak-users", type=int, default=10, help="Concurrent users for soak test")
+    parser.add_argument("--soak-duration", type=int, default=120, help="Soak test duration in seconds")
 
     args = parser.parse_args()
 
@@ -191,11 +350,46 @@ async def main():
             "token": args.token,
         }
 
-    console.print(Panel(
-        f"Target: {args.url}\nMax Pages: {args.max_pages}\nMax Depth: {args.max_depth}\nAuth: {args.auth_type or 'none'}",
-        title="ReQon Bug & Hygiene Discovery Engine",
-        border_style="blue",
-    ))
+    # Build defect config (Layer 5)
+    defect_config = None
+    if args.defect_detection:
+        try:
+            vw, vh = args.defect_viewport.split("x")
+            viewport = {"width": int(vw), "height": int(vh)}
+        except (ValueError, AttributeError):
+            viewport = {"width": 1920, "height": 1080}
+        defect_config = {
+            "enabled": True,
+            "viewport": viewport,
+            "max_pages": args.defect_max_pages,
+        }
+
+    # Build perf config
+    perf_config = None
+    if args.perf_test:
+        test_types = (
+            ["load", "stress", "soak"] if args.test_type == "all" else [args.test_type]
+        )
+        perf_config = {
+            "test_types": test_types,
+            "openapi_spec_path": args.openapi_spec,
+            "load_users": args.load_users,
+            "load_duration_seconds": args.load_duration,
+            "stress_max_users": args.stress_users,
+            "stress_duration_seconds": args.stress_duration,
+            "soak_users": args.soak_users,
+            "soak_duration_seconds": args.soak_duration,
+        }
+
+    startup_info = (
+        f"Target: {args.url}\n"
+        f"Max Pages: {args.max_pages}\n"
+        f"Max Depth: {args.max_depth}\n"
+        f"Auth: {args.auth_type or 'none'}\n"
+        f"Performance Testing: {'YES — ' + args.test_type.upper() if args.perf_test else 'no'}\n"
+        f"Defect Detection: {'YES — viewport ' + args.defect_viewport if args.defect_detection else 'no'}"
+    )
+    console.print(Panel(startup_info, title="ReQon Bug & Hygiene Discovery Engine", border_style="blue"))
 
     start = time.time()
     state = await run_orchestrator(
@@ -203,11 +397,19 @@ async def main():
         auth_config=auth_config,
         max_pages=args.max_pages,
         max_depth=args.max_depth,
+        perf_config=perf_config,
+        defect_config=defect_config,
     )
     elapsed = time.time() - start
 
     console.print(f"\n[bold green]Scan complete in {elapsed:.1f}s[/bold green]\n")
     print_results(state)
+
+    if state.get("perf_result"):
+        print_perf_results(state["perf_result"])
+
+    if state.get("defect_result"):
+        print_defect_results(state["defect_result"])
 
 
 if __name__ == "__main__":

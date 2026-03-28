@@ -25,6 +25,8 @@ from layer1_orchestrator.nodes.planner import plan_node
 from layer1_orchestrator.nodes.auth_handler import auth_node
 from layer1_orchestrator.nodes.crawler_node import crawl_batch_node, cleanup_engines
 from layer1_orchestrator.nodes.evaluator import evaluate_node
+from layer1_orchestrator.nodes.perf_test_node import perf_test_node
+from layer1_orchestrator.nodes.defect_detect_node import defect_detect_node
 from shared.state.redis_state import RedisStateManager
 
 logger = structlog.get_logger()
@@ -61,6 +63,14 @@ class GraphState(TypedDict, total=False):
 
     # Result
     result: dict
+
+    # Performance testing (Layer 3)
+    perf_config: dict       # PerfTestRequest fields from CLI
+    perf_result: dict       # PerformanceTestResult dict
+
+    # Defect detection (Layer 5)
+    defect_config: dict     # Triggers Layer 5; populated with snapshot_artifacts by perf_test_node
+    defect_result: dict     # DefectDetectionResult dict
 
     # Errors
     errors: list[str]
@@ -146,8 +156,25 @@ async def finalize_node(state: dict) -> dict:
     return {"result": result, "phase": "complete"}
 
 
+def should_run_perf_tests(state: GraphState) -> str:
+    """Conditional edge: run performance tests if perf_config is present."""
+    if state.get("perf_config"):
+        logger.info("orchestrator.routing_to_perf_tests")
+        return "perf_test"
+    return END
+
+
+def should_run_defect_detection(state: GraphState) -> str:
+    """Conditional edge: run defect detection if snapshot_artifacts were captured."""
+    defect_config = state.get("defect_config") or {}
+    if defect_config.get("enabled") and defect_config.get("snapshot_artifacts"):
+        logger.info("orchestrator.routing_to_defect_detection")
+        return "defect_detect"
+    return END
+
+
 def build_graph() -> StateGraph:
-    """Build the LangGraph state machine with ReAct loop."""
+    """Build the LangGraph state machine with ReAct loop + optional Layer 3."""
     graph = StateGraph(GraphState)
 
     # Nodes
@@ -156,6 +183,8 @@ def build_graph() -> StateGraph:
     graph.add_node("crawl_batch", crawl_batch_node)
     graph.add_node("evaluate", evaluate_node)
     graph.add_node("finalize", finalize_node)
+    graph.add_node("perf_test", perf_test_node)
+    graph.add_node("defect_detect", defect_detect_node)
 
     # Entry
     graph.set_entry_point("plan")
@@ -181,8 +210,20 @@ def build_graph() -> StateGraph:
         "finalize": "finalize",
     })
 
-    # FINALIZE → END
-    graph.add_edge("finalize", END)
+    # FINALIZE → PERF_TEST (if enabled) or END
+    graph.add_conditional_edges("finalize", should_run_perf_tests, {
+        "perf_test": "perf_test",
+        END: END,
+    })
+
+    # PERF_TEST → DEFECT_DETECT (if visual capture ran) or END
+    graph.add_conditional_edges("perf_test", should_run_defect_detection, {
+        "defect_detect": "defect_detect",
+        END: END,
+    })
+
+    # DEFECT_DETECT → END
+    graph.add_edge("defect_detect", END)
 
     return graph
 
@@ -193,6 +234,8 @@ async def run_orchestrator(
     max_pages: int = 100,
     max_depth: int = 5,
     thread_id: str = "default",
+    perf_config: dict = None,
+    defect_config: dict = None,
 ) -> dict:
     """Main entry point: run the full orchestration pipeline with checkpointing."""
     logger.info("orchestrator.starting", url=target_url)
@@ -212,6 +255,8 @@ async def run_orchestrator(
         "iteration": 0,
         "should_continue": True,
         "errors": [],
+        "perf_config": perf_config or {},
+        "defect_config": defect_config or {},
     }
 
     # Build graph with checkpointing

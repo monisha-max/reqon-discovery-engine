@@ -24,5 +24,13 @@ class Settings:
     # Output
     OUTPUT_DIR: str = os.getenv("OUTPUT_DIR", "output")
 
+    # Performance Testing (Layer 3)
+    PERF_TEST_LOAD_USERS: int = int(os.getenv("PERF_TEST_LOAD_USERS", "10"))
+    PERF_TEST_LOAD_DURATION: int = int(os.getenv("PERF_TEST_LOAD_DURATION", "30"))
+    PERF_TEST_STRESS_MAX_USERS: int = int(os.getenv("PERF_TEST_STRESS_MAX_USERS", "50"))
+    PERF_TEST_STRESS_DURATION: int = int(os.getenv("PERF_TEST_STRESS_DURATION", "60"))
+    PERF_TEST_SOAK_USERS: int = int(os.getenv("PERF_TEST_SOAK_USERS", "10"))
+    PERF_TEST_SOAK_DURATION: int = int(os.getenv("PERF_TEST_SOAK_DURATION", "120"))
+
 
 settings = Settings()
