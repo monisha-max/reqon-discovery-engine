@@ -31,3 +31,11 @@ aiohttp>=3.9.0
 # Logging
 structlog>=24.1.0
 rich>=13.0.0
+
+# Layer 5 - Defect Detection
+Pillow>=10.0.0
+
+# Layer 3 - Performance Testing
+locust>=2.20.0
+pyyaml>=6.0
+Faker>=20.0.0
