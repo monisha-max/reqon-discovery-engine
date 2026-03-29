@@ -315,26 +315,22 @@ class EndpointDiscoverer:
         return endpoints
 
     async def _ai_infer_endpoints(self, pages: list[dict]) -> list[DiscoveredEndpoint]:
-        """Use GPT-4o-mini to infer additional endpoints from page content."""
+        """Infer additional endpoints from page content using OpenAI / Anthropic."""
+        from layer3_performance.llm_client import call_llm
         from config.settings import settings
-        if not settings.OPENAI_API_KEY or not pages:
+        if not (settings.OPENAI_API_KEY or settings.ANTHROPIC_API_KEY) or not pages:
             return []
 
-        try:
-            from openai import AsyncOpenAI
-            client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        page_summaries = []
+        for p in pages[:10]:
+            page_summaries.append({
+                "url": p.get("url", ""),
+                "title": p.get("title", ""),
+                "form_count": p.get("form_count", 0),
+                "markdown_snippet": (p.get("markdown_content") or "")[:500],
+            })
 
-            # Summarize top pages for LLM context
-            page_summaries = []
-            for p in pages[:10]:
-                page_summaries.append({
-                    "url": p.get("url", ""),
-                    "title": p.get("title", ""),
-                    "form_count": p.get("form_count", 0),
-                    "markdown_snippet": (p.get("markdown_content") or "")[:500],
-                })
-
-            prompt = f"""You are an API discovery agent analyzing a web application.
+        prompt = f"""You are an API discovery agent analyzing a web application.
 
 Base URL: {self.base_url}
 Crawled pages summary:
@@ -352,17 +348,13 @@ Respond ONLY with a JSON array (no markdown):
 
 Return at most 10 endpoints. Only include endpoints you are confident exist."""
 
-            response = await client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-                max_tokens=600,
-            )
+        content = await call_llm(prompt, max_tokens=600, temperature=0.2)
+        if content is None:
+            return []
 
-            content = response.choices[0].message.content.strip()
+        try:
             if content.startswith("```"):
                 content = content.split("\n", 1)[1].rsplit("```", 1)[0]
-
             inferred = json.loads(content)
             endpoints = []
             for item in inferred:
@@ -382,10 +374,8 @@ Return at most 10 endpoints. Only include endpoints you are confident exist."""
                     priority=self._score_priority(path),
                     description=item.get("description", ""),
                 ))
-
             logger.info("endpoint_discoverer.ai_inferred", count=len(endpoints))
             return endpoints
-
         except Exception as e:
             logger.warning("endpoint_discoverer.ai_failed", error=str(e))
             return []

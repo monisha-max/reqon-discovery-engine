@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReQon — Discovery Engine</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0f1117;
+  --surface: #1a202c;
+  --surface2: #2d3748;
+  --border: #3a4560;
+  --accent: #63b3ed;
+  --accent2: #4299e1;
+  --text: #e2e8f0;
+  --muted: #718096;
+  --success: #68d391;
+  --error: #fc8181;
+  --warn: #f6ad55;
+  --radius: 10px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+/* ── Nav ─────────────────────────────────────────── */
+nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 40px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+nav .logo {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+}
+nav .tagline {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+/* ── Layout ───────────────────────────────────────── */
+main {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+
+/* ── Views ────────────────────────────────────────── */
+.view { display: none; }
+.view.active { display: block; }
+
+/* ── Headings ─────────────────────────────────────── */
+h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #f7fafc;
+  margin-bottom: 6px;
+}
+.subtitle {
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin-bottom: 36px;
+}
+
+/* ── URL bar ──────────────────────────────────────── */
+.url-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.url-row input {
+  flex: 1;
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 1rem;
+  padding: 12px 16px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.url-row input:focus { border-color: var(--accent); }
+.url-row input::placeholder { color: var(--muted); }
+
+/* ── Buttons ──────────────────────────────────────── */
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: background 0.15s, opacity 0.15s;
+}
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--accent2);
+  color: #fff;
+  padding: 12px 28px;
+  white-space: nowrap;
+}
+.btn-primary:hover:not(:disabled) { background: #3182ce; }
+
+.btn-ghost {
+  background: var(--surface2);
+  color: var(--text);
+  padding: 10px 22px;
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover:not(:disabled) { background: #3a4560; }
+
+.btn-danger {
+  background: #742a2a;
+  color: var(--error);
+  padding: 10px 22px;
+}
+.btn-danger:hover:not(:disabled) { background: #9b2c2c; }
+
+/* ── Collapsible sections ─────────────────────────── */
+.collapsible {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+.collapsible-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--text);
+}
+.collapsible-header:hover { background: var(--surface2); }
+.chevron {
+  margin-left: auto;
+  transition: transform 0.2s;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.collapsible.open .chevron { transform: rotate(180deg); }
+.collapsible-body {
+  display: none;
+  padding: 0 18px 18px;
+}
+.collapsible.open .collapsible-body { display: block; }
+
+/* ── Form fields ──────────────────────────────────── */
+.field-row {
+  display: flex;
+  gap: 14px;
+  margin-top: 14px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 5px;
+}
+.field label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+.field input, .field select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  font-size: 0.9rem;
+  padding: 9px 12px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.field input:focus, .field select:focus { border-color: var(--accent); }
+.field select option { background: var(--surface2); }
+
+/* ── Checkbox toggle ──────────────────────────────── */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font-size: 0.9rem;
+}
+.toggle-row input[type="checkbox"] {
+  width: 16px; height: 16px;
+  accent-color: var(--accent2);
+  cursor: pointer;
+}
+
+/* ── Auth fields (shown/hidden by checkbox) ───────── */
+#auth-fields { margin-top: 4px; }
+#auth-fields.hidden { display: none; }
+
+/* ── Advanced options ─────────────────────────────── */
+.options-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 14px;
+}
+.test-type-row {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.test-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.test-chip input { accent-color: var(--accent2); }
+
+/* ── Scan button row ──────────────────────────────── */
+.scan-btn-row {
+  margin-top: 28px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+#error-msg {
+  color: var(--error);
+  font-size: 0.88rem;
+  display: none;
+}
+
+/* ── Running view ─────────────────────────────────── */
+.phase-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+.phase-pill {
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--surface2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  transition: all 0.2s;
+}
+.phase-pill.active {
+  background: #1a3a5c;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.phase-pill.done {
+  background: #1a3a2a;
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.stats-mini {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+.stat-mini {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 20px;
+  text-align: center;
+  min-width: 100px;
+}
+.stat-mini .val { font-size: 1.4rem; font-weight: 700; color: #f7fafc; }
+.stat-mini .lbl { font-size: 0.72rem; color: var(--muted); }
+
+.log-container {
+  background: #0a0d14;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  height: 340px;
+  overflow-y: auto;
+  font-family: 'SFMono-Regular', 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-size: 0.78rem;
+  color: #a0aec0;
+  scroll-behavior: smooth;
+}
+.log-container .log-line { margin-bottom: 2px; line-height: 1.5; }
+.log-container .log-line.err { color: var(--error); }
+.log-container .log-line.warn { color: var(--warn); }
+
+.running-actions { margin-top: 18px; display: flex; gap: 12px; }
+
+/* ── Results view ─────────────────────────────────── */
+.results-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+@media (min-width: 600px) {
+  .results-cards { grid-template-columns: repeat(4, 1fr); }
+}
+.result-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  text-align: center;
+}
+.result-card .big-num { font-size: 2rem; font-weight: 700; color: #f7fafc; }
+.result-card .card-lbl { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+
+.section-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+.section-block h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f7fafc;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.finding-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+.finding-row:last-child { border-bottom: none; }
+.sev-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+.sev-critical, .sev-high { background: #742a2a; color: var(--error); }
+.sev-medium { background: #7b341e; color: var(--warn); }
+.sev-low { background: #1a3a2a; color: var(--success); }
+
+.bottleneck-item {
+  background: #2d1f1f;
+  border-left: 3px solid var(--error);
+  padding: 7px 12px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  color: #e2e8f0;
+}
+
+.rec-item {
+  padding: 6px 0;
+  font-size: 0.85rem;
+  border-bottom: 1px solid var(--border);
+  color: #cbd5e0;
+}
+.rec-item:last-child { border-bottom: none; }
+
+.report-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 16px;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-right: 10px;
+  margin-top: 6px;
+}
+.report-link:hover { background: #3a4560; }
+
+.results-actions { margin-top: 24px; }
+
+.empty-state {
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: 10px 0;
+}
+
+/* ── Error banner ─────────────────────────────────── */
+.error-banner {
+  background: #2d1f1f;
+  border: 1px solid var(--error);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  color: var(--error);
+  margin-bottom: 20px;
+  font-size: 0.9rem;
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">ReQon</span>
+  <span class="tagline">Bug &amp; Performance Discovery Engine</span>
+</nav>
+
+<main>
+
+  <!-- ================================================================== -->
+  <!-- VIEW 1 — Input                                                      -->
+  <!-- ================================================================== -->
+  <div id="view-input" class="view active">
+
+    <h1>Run a Full Scan</h1>
+    <p class="subtitle">Enter a URL to crawl, test performance, and detect visual defects.</p>
+
+    <!-- URL bar -->
+    <div class="url-row">
+      <input id="target-url" type="url" placeholder="https://your-app.com" autocomplete="off" spellcheck="false">
+    </div>
+
+    <!-- Auth section -->
+    <div class="collapsible" id="auth-section">
+      <div class="collapsible-header" onclick="toggleSection('auth-section')">
+        <span>🔐</span>
+        <span>Authentication</span>
+        <span style="font-size:0.78rem;color:var(--muted);font-weight:400;margin-left:6px;">Test pages behind a login</span>
+        <span class="chevron">▼</span>
+      </div>
+      <div class="collapsible-body">
+        <div class="toggle-row">
+          <input type="checkbox" id="auth-enabled" onchange="toggleAuthFields()">
+          <label for="auth-enabled">This site requires login</label>
+        </div>
+        <div id="auth-fields" class="hidden">
+          <!-- Auth method selector — shown first so it controls which fields appear -->
+          <div class="field-row" style="margin-top:14px;">
+            <div class="field">
+              <label for="auth-type">Auth method</label>
+              <select id="auth-type" onchange="onAuthTypeChange()">
+                <option value="form">Form login (username + password)</option>
+                <option value="basic">HTTP Basic auth</option>
+                <option value="header">Bearer token (Authorization header)</option>
+                <option value="cookie_replay">Session cookies (OTP / SSO / any login)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Fields shown for form / basic / bearer -->
+          <div id="cred-fields">
+            <div class="field-row">
+              <div class="field">
+                <label for="auth-username">Username / Email</label>
+                <input id="auth-username" type="text" placeholder="user@example.com" autocomplete="username">
+              </div>
+              <div class="field">
+                <label for="auth-password">Password</label>
+                <input id="auth-password" type="password" placeholder="••••••••" autocomplete="current-password">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="login-url">Login URL <span style="color:var(--muted)">(optional)</span></label>
+                <input id="login-url" type="url" placeholder="https://your-app.com/login">
+              </div>
+            </div>
+          </div>
+
+          <!-- Fields shown for cookie_replay -->
+          <div id="cookie-fields" style="display:none;">
+            <div class="field" style="margin-top:14px;">
+              <label for="session-cookies">
+                Paste session cookies from DevTools
+                <span style="color:var(--muted);font-weight:400;">
+                  — Application → Cookies → click your domain → copy Name=Value pairs
+                </span>
+              </label>
+              <textarea id="session-cookies"
+                rows="3"
+                placeholder="access_token=eyJhbGci...; refresh_token=eyJhbGci..."
+                style="width:100%;background:var(--surface2);border:1px solid var(--border);
+                       border-radius:7px;color:var(--text);font-size:0.85rem;padding:10px 12px;
+                       outline:none;resize:vertical;font-family:monospace;"></textarea>
+            </div>
+            <div style="margin-top:10px;background:#1a2a1a;border:1px solid #2d5a2d;border-radius:7px;padding:12px 14px;font-size:0.78rem;color:#a0c4a0;line-height:1.7;">
+              <strong style="color:#68d391;">How to get cookies for OTP / phone login sites:</strong><br>
+              1. Open the site in Chrome and log in normally (complete OTP on your phone)<br>
+              2. Open DevTools → <strong>Application</strong> → <strong>Cookies</strong> → click your domain<br>
+              3. Find <strong>access_token</strong> (or sessionid / authToken) — double-click the Value cell to select all<br>
+              4. Paste it above as: <code style="background:#0f1117;padding:1px 5px;border-radius:3px;">access_token=&lt;paste value here&gt;</code><br>
+              5. Multiple cookies: separate with <code style="background:#0f1117;padding:1px 5px;border-radius:3px;">;</code>
+            </div>
+          </div>
+
+          <p style="margin-top:12px;font-size:0.77rem;color:var(--muted);">
+            🔒 Your credentials are used once to authenticate and are never stored, logged, or written to disk.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Advanced options -->
+    <div class="collapsible" id="adv-section">
+      <div class="collapsible-header" onclick="toggleSection('adv-section')">
+        <span>⚙</span>
+        <span>Advanced Options</span>
+        <span class="chevron">▼</span>
+      </div>
+      <div class="collapsible-body">
+        <div class="options-grid">
+          <div class="field">
+            <label for="max-pages">Max pages to crawl</label>
+            <input id="max-pages" type="number" value="50" min="1" max="500">
+          </div>
+          <div class="field">
+            <label for="max-depth">Max crawl depth</label>
+            <input id="max-depth" type="number" value="5" min="1" max="20">
+          </div>
+        </div>
+        <div class="toggle-row" style="margin-top:16px;">
+          <input type="checkbox" id="enable-perf" checked>
+          <label for="enable-perf">Run performance tests</label>
+          <span style="margin-left:20px"></span>
+          <input type="checkbox" id="enable-defect" checked>
+          <label for="enable-defect">Run defect detection</label>
+        </div>
+        <div class="test-type-row" id="test-types-row">
+          <span style="font-size:0.8rem;color:var(--muted);align-self:center;">Test types:</span>
+          <label class="test-chip"><input type="checkbox" value="load" checked> Load</label>
+          <label class="test-chip"><input type="checkbox" value="stress"> Stress</label>
+          <label class="test-chip"><input type="checkbox" value="soak"> Soak</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="scan-btn-row">
+      <button class="btn-primary" onclick="startScan()" style="padding:13px 40px;font-size:1rem;">
+        Start Scan
+      </button>
+      <span id="error-msg"></span>
+    </div>
+
+  </div><!-- /view-input -->
+
+
+  <!-- ================================================================== -->
+  <!-- VIEW 2 — Running                                                    -->
+  <!-- ================================================================== -->
+  <div id="view-running" class="view">
+
+    <h1 style="margin-bottom:4px;">Scanning…</h1>
+    <p class="subtitle" id="running-target"></p>
+
+    <div class="phase-bar" id="phase-bar">
+      <div class="phase-pill" data-phase="starting">Initialising</div>
+      <div class="phase-pill" data-phase="plan">Plan</div>
+      <div class="phase-pill" data-phase="auth">Auth</div>
+      <div class="phase-pill" data-phase="crawl">Crawl</div>
+      <div class="phase-pill" data-phase="evaluate">Evaluate</div>
+      <div class="phase-pill" data-phase="perf">Performance</div>
+      <div class="phase-pill" data-phase="defect">Defect</div>
+      <div class="phase-pill" data-phase="complete">Complete</div>
+    </div>
+
+    <div class="stats-mini">
+      <div class="stat-mini">
+        <div class="val" id="stat-pages">0</div>
+        <div class="lbl">Pages found</div>
+      </div>
+      <div class="stat-mini">
+        <div class="val" id="stat-phase">—</div>
+        <div class="lbl">Current phase</div>
+      </div>
+      <div class="stat-mini">
+        <div class="val" id="stat-status">—</div>
+        <div class="lbl">Status</div>
+      </div>
+      <div class="stat-mini" id="stat-auth-box" style="display:none;">
+        <div class="val" id="stat-auth" style="font-size:1rem;">—</div>
+        <div class="lbl">Auth</div>
+      </div>
+    </div>
+
+    <div class="log-container" id="log-box"></div>
+
+    <div class="running-actions">
+      <button class="btn-ghost" onclick="cancelScan()">✕ Cancel</button>
+    </div>
+
+  </div><!-- /view-running -->
+
+
+  <!-- ================================================================== -->
+  <!-- VIEW 3 — Results                                                    -->
+  <!-- ================================================================== -->
+  <div id="view-results" class="view">
+
+    <h1 style="margin-bottom:4px;">Scan Complete</h1>
+    <p class="subtitle" id="results-target"></p>
+
+    <div id="error-banner" class="error-banner" style="display:none;"></div>
+    <div id="auth-banner" style="display:none;margin-bottom:16px;padding:12px 18px;border-radius:var(--radius);font-size:0.88rem;"></div>
+
+    <div class="results-cards">
+      <div class="result-card">
+        <div class="big-num" id="res-pages">—</div>
+        <div class="card-lbl">Pages Crawled</div>
+      </div>
+      <div class="result-card">
+        <div class="big-num" id="res-defects">—</div>
+        <div class="card-lbl">Defects Found</div>
+      </div>
+      <div class="result-card">
+        <div class="big-num" id="res-bottlenecks">—</div>
+        <div class="card-lbl">Bottlenecks</div>
+      </div>
+      <div class="result-card">
+        <div class="big-num" id="res-coverage">—</div>
+        <div class="card-lbl">Coverage Score</div>
+      </div>
+    </div>
+
+    <!-- Defect findings -->
+    <div class="section-block" id="defects-section" style="display:none;">
+      <h3>Top Defects</h3>
+      <div id="defects-list"></div>
+    </div>
+
+    <!-- Performance bottlenecks -->
+    <div class="section-block" id="perf-section" style="display:none;">
+      <h3>Performance Bottlenecks</h3>
+      <div id="bottlenecks-list"></div>
+      <div id="recommendations-list" style="margin-top:14px;"></div>
+    </div>
+
+    <!-- AI analysis -->
+    <div class="section-block" id="ai-section" style="display:none;">
+      <h3>AI Analysis</h3>
+      <p id="ai-text" style="font-size:0.88rem;color:#cbd5e0;line-height:1.7;"></p>
+    </div>
+
+    <!-- Report links -->
+    <div class="section-block" id="reports-section" style="display:none;">
+      <h3>Full Reports</h3>
+      <div id="report-links"></div>
+    </div>
+
+    <div class="results-actions">
+      <button class="btn-ghost" onclick="newScan()">← New Scan</button>
+    </div>
+
+  </div><!-- /view-results -->
+
+</main>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────────────────────────────────
+let _scanId = null;
+let _sse = null;
+let _pollInterval = null;
+
+// ─────────────────────────────────────────────────────────────────────────
+// View helpers
+// ─────────────────────────────────────────────────────────────────────────
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function toggleSection(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+function toggleAuthFields() {
+  const enabled = document.getElementById('auth-enabled').checked;
+  document.getElementById('auth-fields').classList.toggle('hidden', !enabled);
+  if (enabled) document.getElementById('auth-section').classList.add('open');
+}
+
+function onAuthTypeChange() {
+  const type = document.getElementById('auth-type').value;
+  const isCookie = type === 'cookie_replay';
+  document.getElementById('cred-fields').style.display = isCookie ? 'none' : 'block';
+  document.getElementById('cookie-fields').style.display = isCookie ? 'block' : 'none';
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Start scan
+// ─────────────────────────────────────────────────────────────────────────
+async function startScan() {
+  const url = document.getElementById('target-url').value.trim();
+  const errEl = document.getElementById('error-msg');
+  errEl.style.display = 'none';
+
+  if (!url) {
+    errEl.textContent = 'Please enter a URL.';
+    errEl.style.display = 'inline';
+    return;
+  }
+  try { new URL(url); }
+  catch(_) {
+    errEl.textContent = 'Please enter a valid URL (include https://).';
+    errEl.style.display = 'inline';
+    return;
+  }
+
+  const authEnabled = document.getElementById('auth-enabled').checked;
+  const authType = document.getElementById('auth-type').value;
+  let auth = null;
+
+  if (authEnabled) {
+    if (authType === 'cookie_replay') {
+      const cookieStr = document.getElementById('session-cookies').value.trim();
+      document.getElementById('session-cookies').value = '';  // clear immediately
+      if (cookieStr) {
+        auth = {
+          auth_type: 'cookie_replay',
+          cookie_string: cookieStr,   // server parses this into cookie list
+        };
+      }
+    } else {
+      const username = document.getElementById('auth-username').value.trim();
+      const password = document.getElementById('auth-password').value;
+      document.getElementById('auth-password').value = '';   // clear immediately
+      if (username) {
+        auth = {
+          username,
+          password,
+          auth_type: authType,
+          login_url: document.getElementById('login-url').value.trim() || '',
+        };
+      }
+    }
+  }
+
+  const testTypes = Array.from(
+    document.querySelectorAll('#test-types-row input[type="checkbox"]:checked')
+  ).map(c => c.value);
+
+  const payload = {
+    target_url: url,
+    auth: auth,
+    max_pages: parseInt(document.getElementById('max-pages').value) || 50,
+    max_depth: parseInt(document.getElementById('max-depth').value) || 5,
+    enable_perf: document.getElementById('enable-perf').checked,
+    enable_defect: document.getElementById('enable-defect').checked,
+    test_types: testTypes.length ? testTypes : ['load'],
+  };
+
+  let resp;
+  try {
+    resp = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch(e) {
+    errEl.textContent = 'Could not connect to server: ' + e.message;
+    errEl.style.display = 'inline';
+    return;
+  }
+
+  if (!resp.ok) {
+    const t = await resp.text();
+    errEl.textContent = 'Error starting scan: ' + t;
+    errEl.style.display = 'inline';
+    return;
+  }
+
+  const data = await resp.json();
+  _scanId = data.scan_id;
+
+  // Switch to running view
+  document.getElementById('running-target').textContent = url;
+  document.getElementById('log-box').innerHTML = '';
+  _resetPhases();
+  showView('view-running');
+
+  _startSSE();
+  _startPoll();
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// SSE — live logs
+// ─────────────────────────────────────────────────────────────────────────
+function _startSSE() {
+  if (_sse) { _sse.close(); _sse = null; }
+  _sse = new EventSource(`/api/scan/${_scanId}/stream`);
+
+  _sse.onmessage = function(e) {
+    if (e.data === '__DONE__') {
+      _sse.close(); _sse = null;
+      _fetchResult();
+      return;
+    }
+    _appendLog(e.data);
+  };
+
+  _sse.onerror = function() {
+    // Connection dropped — SSE will auto-retry; if scan is done we fetch result
+    _fetchResult();
+  };
+}
+
+function _appendLog(msg) {
+  const box = document.getElementById('log-box');
+  const line = document.createElement('div');
+  line.className = 'log-line' +
+    (msg.toLowerCase().includes('error') ? ' err' :
+     msg.toLowerCase().includes('warn') ? ' warn' : '');
+  line.textContent = msg;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Poll — status updates
+// ─────────────────────────────────────────────────────────────────────────
+function _startPoll() {
+  _stopPoll();
+  _pollInterval = setInterval(_pollStatus, 2500);
+}
+
+function _stopPoll() {
+  if (_pollInterval) { clearInterval(_pollInterval); _pollInterval = null; }
+}
+
+let _consecutive404 = 0;
+
+async function _pollStatus() {
+  if (!_scanId) return;
+  try {
+    const resp = await fetch(`/api/scan/${_scanId}/status`);
+
+    // 404 means server restarted and lost the scan from memory
+    if (resp.status === 404) {
+      _consecutive404++;
+      if (_consecutive404 >= 2) {
+        _stopPoll();
+        if (_sse) { _sse.close(); _sse = null; }
+        _renderError(
+          'The server restarted while your scan was running and the scan state was lost. ' +
+          'Please start a new scan. Tip: use --no-reload to prevent this.'
+        );
+      }
+      return;
+    }
+    _consecutive404 = 0;
+
+    if (!resp.ok) return;
+    const s = await resp.json();
+
+    document.getElementById('stat-pages').textContent = s.pages_found || '0';
+    document.getElementById('stat-phase').textContent = s.phase || '—';
+    document.getElementById('stat-status').textContent = s.status || '—';
+
+    // Auth status badge
+    if (s.auth_status && s.auth_status !== 'not_attempted') {
+      const box = document.getElementById('stat-auth-box');
+      const el = document.getElementById('stat-auth');
+      box.style.display = 'block';
+      if (s.auth_status === 'success') {
+        el.textContent = '✓ ' + (s.auth_strategy || 'ok');
+        el.style.color = 'var(--success)';
+      } else if (s.auth_status === 'failed') {
+        el.textContent = '✗ failed';
+        el.style.color = 'var(--error)';
+      } else if (s.auth_status === 'skipped') {
+        el.textContent = '— skipped';
+        el.style.color = 'var(--muted)';
+      }
+    }
+
+    _updatePhaseBar(s.phase);
+
+    if (s.status === 'done' || s.status === 'error') {
+      _stopPoll();
+      _fetchResult();
+    }
+  } catch(_) {}
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Phase bar
+// ─────────────────────────────────────────────────────────────────────────
+const _PHASE_ORDER = ['starting','plan','auth','crawl','evaluate','perf','defect','complete'];
+
+function _resetPhases() {
+  document.querySelectorAll('.phase-pill').forEach(p => {
+    p.classList.remove('active','done');
+  });
+}
+
+function _updatePhaseBar(phase) {
+  const idx = _PHASE_ORDER.indexOf(phase);
+  document.querySelectorAll('.phase-pill').forEach((p, i) => {
+    p.classList.remove('active','done');
+    if (i < idx) p.classList.add('done');
+    else if (i === idx) p.classList.add('active');
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Fetch and render result
+// ─────────────────────────────────────────────────────────────────────────
+async function _fetchResult() {
+  if (!_scanId) return;
+  _stopPoll();
+
+  // Check status first
+  let statusData;
+  try {
+    const sr = await fetch(`/api/scan/${_scanId}/status`);
+    statusData = await sr.json();
+  } catch(_) { return; }
+
+  if (statusData.status === 'error') {
+    _renderError(statusData.error_message);
+    return;
+  }
+  if (statusData.status !== 'done') return;  // still running
+
+  try {
+    const rr = await fetch(`/api/scan/${_scanId}/result`);
+    if (!rr.ok) return;
+    const result = await rr.json();
+    _renderResult(result, statusData);
+  } catch(e) {
+    _renderError('Failed to fetch results: ' + e.message);
+  }
+}
+
+function _renderError(msg) {
+  document.getElementById('results-target').textContent = 'Scan failed';
+  document.getElementById('error-banner').textContent = '⚠ ' + msg;
+  document.getElementById('error-banner').style.display = 'block';
+  _updatePhaseBar('error');
+  showView('view-results');
+}
+
+function _renderResult(result, statusData) {
+  document.getElementById('results-target').textContent = result.target_url || '';
+  document.getElementById('error-banner').style.display = 'none';
+
+  // Auth result banner
+  const authBanner = document.getElementById('auth-banner');
+  const authStatus = statusData.auth_status || 'not_attempted';
+  const authStrategy = statusData.auth_strategy || '';
+  if (authStatus === 'success') {
+    authBanner.style.display = 'block';
+    authBanner.style.background = '#1a3a2a';
+    authBanner.style.border = '1px solid var(--success)';
+    authBanner.style.color = 'var(--success)';
+    authBanner.innerHTML = `✓ <strong>Login successful</strong> — strategy: <code>${_esc(authStrategy)}</code>. Logged-in pages were crawled and tested.`;
+  } else if (authStatus === 'failed') {
+    authBanner.style.display = 'block';
+    authBanner.style.background = '#2d1f1f';
+    authBanner.style.border = '1px solid var(--error)';
+    authBanner.style.color = 'var(--error)';
+    authBanner.innerHTML = '✗ <strong>Login failed</strong> — scan ran on public pages only. Check that your cookies are valid and not expired.';
+  } else if (authStatus === 'skipped') {
+    authBanner.style.display = 'block';
+    authBanner.style.background = 'var(--surface2)';
+    authBanner.style.border = '1px solid var(--border)';
+    authBanner.style.color = 'var(--muted)';
+    authBanner.innerHTML = '— <strong>No auth configured</strong> — only public pages were scanned.';
+  } else {
+    authBanner.style.display = 'none';
+  }
+
+  document.getElementById('res-pages').textContent = result.pages_crawled ?? '—';
+  document.getElementById('res-coverage').textContent =
+    result.coverage_score ? (result.coverage_score * 100).toFixed(0) + '%' : '—';
+
+  // ── Defects ──────────────────────────────────────────
+  const defect = result.defect_result;
+  if (defect) {
+    document.getElementById('res-defects').textContent = defect.total_findings ?? 0;
+    const secEl = document.getElementById('defects-section');
+    const listEl = document.getElementById('defects-list');
+    if (defect.top_findings && defect.top_findings.length) {
+      secEl.style.display = 'block';
+      listEl.innerHTML = defect.top_findings.map(f => `
+        <div class="finding-row">
+          <span class="sev-badge sev-${(f.severity||'low').toLowerCase()}">${f.severity||'low'}</span>
+          <span style="flex:1;">
+            <strong style="color:#e2e8f0;">${_esc(f.category)}</strong> —
+            ${_esc(f.description)}
+            <span style="color:var(--muted);font-size:0.77rem;display:block;">${_esc(f.url)}</span>
+          </span>
+        </div>`).join('');
+    } else {
+      secEl.style.display = 'block';
+      listEl.innerHTML = '<p class="empty-state">No defects detected.</p>';
+    }
+
+    // Report link
+    if (defect.report_path) {
+      const rSec = document.getElementById('reports-section');
+      rSec.style.display = 'block';
+      document.getElementById('report-links').innerHTML +=
+        `<a class="report-link" href="/${_outputRelPath(defect.report_path)}" target="_blank">📋 Defect Report</a>`;
+    }
+  } else {
+    document.getElementById('res-defects').textContent = '—';
+  }
+
+  // ── Performance ────────────────────────────────────────
+  const perf = result.perf_result;
+  if (perf) {
+    document.getElementById('res-bottlenecks').textContent = perf.bottlenecks ? perf.bottlenecks.length : 0;
+    const perfSec = document.getElementById('perf-section');
+    perfSec.style.display = 'block';
+
+    const blEl = document.getElementById('bottlenecks-list');
+    if (perf.bottlenecks && perf.bottlenecks.length) {
+      blEl.innerHTML = perf.bottlenecks.map(b =>
+        `<div class="bottleneck-item">${_esc(b)}</div>`
+      ).join('');
+    } else {
+      blEl.innerHTML = '<p class="empty-state">No bottlenecks detected.</p>';
+    }
+
+    if (perf.recommendations && perf.recommendations.length) {
+      document.getElementById('recommendations-list').innerHTML =
+        '<strong style="font-size:0.85rem;color:#a0aec0;">Recommendations</strong>' +
+        perf.recommendations.map(r => `<div class="rec-item">• ${_esc(r)}</div>`).join('');
+    }
+
+    if (perf.ai_analysis) {
+      const aiSec = document.getElementById('ai-section');
+      aiSec.style.display = 'block';
+      document.getElementById('ai-text').textContent = perf.ai_analysis;
+    }
+
+    if (perf.report_path) {
+      const rSec = document.getElementById('reports-section');
+      rSec.style.display = 'block';
+      document.getElementById('report-links').innerHTML +=
+        `<a class="report-link" href="/${_outputRelPath(perf.report_path)}" target="_blank">📊 Performance Report</a>`;
+    }
+  } else {
+    document.getElementById('res-bottlenecks').textContent = '—';
+  }
+
+  _updatePhaseBar('complete');
+  showView('view-results');
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Cancel / new scan
+// ─────────────────────────────────────────────────────────────────────────
+function cancelScan() {
+  if (_sse) { _sse.close(); _sse = null; }
+  _stopPoll();
+  _scanId = null;
+  newScan();
+}
+
+function newScan() {
+  if (_sse) { _sse.close(); _sse = null; }
+  _stopPoll();
+  _scanId = null;
+  // Reset results sections
+  document.getElementById('defects-section').style.display = 'none';
+  document.getElementById('perf-section').style.display = 'none';
+  document.getElementById('ai-section').style.display = 'none';
+  document.getElementById('reports-section').style.display = 'none';
+  document.getElementById('report-links').innerHTML = '';
+  document.getElementById('error-banner').style.display = 'none';
+  document.getElementById('auth-banner').style.display = 'none';
+  document.getElementById('stat-auth-box').style.display = 'none';
+  showView('view-input');
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Utilities
+// ─────────────────────────────────────────────────────────────────────────
+function _esc(s) {
+  if (!s) return '';
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function _outputRelPath(absPath) {
+  // Convert absolute disk path to /output/... URL
+  // e.g. /Users/.../output/perf_reports/report.html → output/perf_reports/report.html
+  const match = absPath.replace(/\\/g, '/').match(/\/?(output\/.+)$/);
+  return match ? match[1] : absPath;
+}
+
+// Allow Enter key to submit
+document.getElementById('target-url').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startScan();
+});
+</script>
+</body>
+</html>

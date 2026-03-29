@@ -38,7 +38,16 @@ async def plan_node(state: dict) -> dict:
     target_url = request["target_url"] if isinstance(request, dict) else request.target_url
     auth_config = request.get("auth_config") if isinstance(request, dict) else request.auth_config
 
-    logger.info("planner.analyzing", url=target_url)
+    # Diagnostic: log what auth_config arrived with
+    auth_type_received = None
+    if isinstance(auth_config, dict):
+        auth_type_received = auth_config.get("auth_type")
+    logger.info(
+        "planner.analyzing",
+        url=target_url,
+        has_auth_config=auth_config is not None,
+        auth_type=auth_type_received,
+    )
 
     # Try LLM planner first, fall back to rules
     plan = None
@@ -47,6 +56,14 @@ async def plan_node(state: dict) -> dict:
 
     if not plan:
         plan = _rule_based_plan(target_url, auth_config)
+
+    # Final override (belt-and-braces): if auth_config was provided, needs_auth must be True
+    if auth_config:
+        auth_dict = auth_config if isinstance(auth_config, dict) else {}
+        if auth_dict.get("auth_type") and auth_dict["auth_type"] != "none":
+            plan["needs_auth"] = True
+        if auth_dict.get("cookies") or auth_dict.get("username") or auth_dict.get("login_url"):
+            plan["needs_auth"] = True
 
     logger.info(
         "planner.plan_created",
@@ -119,7 +136,7 @@ def _rule_based_plan(target_url: str, auth_config=None) -> dict:
         auth_dict = auth_config if isinstance(auth_config, dict) else auth_config.model_dump()
         if auth_dict.get("auth_type") and auth_dict["auth_type"] != "none":
             needs_auth = True
-        if auth_dict.get("login_url") or auth_dict.get("username"):
+        if auth_dict.get("login_url") or auth_dict.get("username") or auth_dict.get("cookies"):
             needs_auth = True
 
     # Domain-based heuristics

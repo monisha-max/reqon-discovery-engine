@@ -45,12 +45,21 @@ def _contrast_ratio(
     return (lighter + 0.05) / (darker + 0.05)
 
 
-_CSS_COLOR_RE = re.compile(r"rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)")
+_CSS_RGB_RE  = re.compile(r"rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)")
+_CSS_RGBA_RE = re.compile(r"rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)")
 
 
 def _parse_css_color(css: str) -> Optional[tuple[int, int, int]]:
-    """Parse 'rgb(r, g, b)' or 'rgba(r, g, b, a)' → (r, g, b)."""
-    m = _CSS_COLOR_RE.match(css or "")
+    """Parse 'rgb(r, g, b)' or 'rgba(r, g, b, a)' → (r, g, b), or None if transparent/unparseable."""
+    css = (css or "").strip()
+    m = _CSS_RGBA_RE.match(css)
+    if m:
+        alpha = float(m.group(4))
+        if alpha < 0.05:
+            # Fully or near-fully transparent — no usable background color
+            return None
+        return int(m.group(1)), int(m.group(2)), int(m.group(3))
+    m = _CSS_RGB_RE.match(css)
     if m:
         return int(m.group(1)), int(m.group(2)), int(m.group(3))
     return None
@@ -78,10 +87,6 @@ class ContrastAnalyzer:
         fg = _parse_css_color(el.color)
         bg = _parse_css_color(el.background_color)
         if not fg or not bg:
-            return None
-
-        # Skip if bg is fully transparent (rgba(0,0,0,0))
-        if el.background_color.startswith("rgba") and el.background_color.endswith(", 0)"):
             return None
 
         ratio = _contrast_ratio(fg, bg)

@@ -149,7 +149,7 @@ _MIN_OVERLAP_AREA = 6.0
 _DRIFT_THRESHOLD_PX = 5.0
 
 # Only scan elements within this many viewport heights of the top
-_MAX_Y_FACTOR = 3
+_MAX_Y_FACTOR = 5
 
 
 class LayoutAnalyzer:
@@ -230,17 +230,45 @@ class LayoutAnalyzer:
 # Detection helpers
 # ---------------------------------------------------------------------------
 
+def _bbox_contains(outer: BoundingBox, inner: BoundingBox) -> bool:
+    """Return True if outer fully or substantially contains inner (80%+ area)."""
+    area_inner = inner.width * inner.height
+    if area_inner <= 0:
+        return False
+    ix = max(outer.x, inner.x)
+    iy = max(outer.y, inner.y)
+    iw = min(outer.x + outer.width,  inner.x + inner.width)  - ix
+    ih = min(outer.y + outer.height, inner.y + inner.height) - iy
+    if iw <= 0 or ih <= 0:
+        return False
+    return (iw * ih) / area_inner >= 0.80
+
+
 def _detect_overlaps(elements: list[ElementInfo], phase: str) -> list[DefectFinding]:
+    """
+    Detect overlapping elements using a sweep-line approach (sort by x) to skip
+    obviously non-overlapping pairs and reduce the effective comparison set.
+    Parent-child nesting is detected by bbox containment (80%+ overlap), not
+    selector string prefix matching.
+    """
     findings = []
-    n = len(elements)
+    # Sort by left edge for sweep-line pruning
+    sorted_els = sorted(elements, key=lambda e: e.bbox.x)
+    n = len(sorted_els)
+
     for i in range(n):
+        a = sorted_els[i]
+        a_right = a.bbox.x + a.bbox.width
         for j in range(i + 1, n):
-            a, b = elements[i], elements[j]
+            b = sorted_els[j]
+            # Sweep-line early exit: b starts after a ends horizontally
+            if b.bbox.x >= a_right:
+                break
             area = a.bbox.intersection_area(b.bbox)
             if area < _MIN_OVERLAP_AREA:
                 continue
-            # Skip if they share a parent-child relationship (legitimate nesting)
-            if a.selector.startswith(b.selector) or b.selector.startswith(a.selector):
+            # Skip legitimate parent-child containment (one mostly inside the other)
+            if _bbox_contains(a.bbox, b.bbox) or _bbox_contains(b.bbox, a.bbox):
                 continue
             finding = _make_overlap_finding(a, b, area, phase)
             findings.append(finding)

@@ -101,6 +101,29 @@ class EndpointMetrics(BaseModel):
 # One Complete Test Run
 # ---------------------------------------------------------------------------
 
+class SoakTrendPoint(BaseModel):
+    """A single time-series data point from Locust history CSV."""
+    timestamp: float           # Unix epoch seconds
+    p50_ms: float = 0.0
+    p95_ms: float = 0.0
+    p99_ms: float = 0.0
+    rps: float = 0.0
+    error_rate: float = 0.0
+
+
+class SoakDegradation(BaseModel):
+    """Soak test degradation analysis (time-series slope detection)."""
+    endpoint: str
+    method: str
+    # Slope of p95 over test duration (ms/minute); positive = degrading
+    p95_slope_ms_per_min: float = 0.0
+    p99_slope_ms_per_min: float = 0.0
+    start_p95_ms: float = 0.0
+    end_p95_ms: float = 0.0
+    is_degrading: bool = False          # True if slope exceeds threshold
+    degradation_summary: str = ""
+
+
 class TestRunResult(BaseModel):
     """Results of a single test type (load, stress, or soak)."""
     test_type: TestType
@@ -116,6 +139,10 @@ class TestRunResult(BaseModel):
 
     # Per-endpoint breakdown
     endpoint_metrics: list[EndpointMetrics] = Field(default_factory=list)
+
+    # Soak-specific: time-series degradation analysis
+    soak_trend: list[SoakTrendPoint] = Field(default_factory=list)
+    soak_degradations: list[SoakDegradation] = Field(default_factory=list)
 
     # Raw Locust stats snapshot (for debugging / export)
     raw_stats: Optional[dict] = None
@@ -143,6 +170,9 @@ class PerformanceTestResult(BaseModel):
 
     # Generated Locust script (saved to disk)
     generated_script_path: str = ""
+
+    # Report paths (populated after run)
+    report_path: str = ""        # HTML report
 
     # Timing
     total_duration_seconds: float = 0.0
@@ -176,3 +206,12 @@ class PerfTestRequest(BaseModel):
     # Auth (reuse from orchestrator)
     auth_headers: dict[str, str] = Field(default_factory=dict)
     storage_state_path: Optional[str] = None
+
+    # Bottleneck detection thresholds (override defaults in ResultsAnalyzer)
+    p99_threshold_ms: float = 2000.0          # p99 above this = bottleneck
+    error_rate_threshold: float = 0.05        # error rate above this = bottleneck
+    degradation_factor: float = 2.5           # stress/load p99 ratio above this = degradation
+    rps_drop_factor: float = 0.5              # RPS drops below this fraction = throughput collapse
+
+    # Warmup: number of requests per endpoint to send before timing begins
+    warmup_requests: int = 0                  # 0 = no warmup

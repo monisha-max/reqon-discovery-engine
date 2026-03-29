@@ -20,6 +20,7 @@ from urllib.parse import urlparse
 import structlog
 from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 
+import layer4_auth.monitor_singleton as _monitor
 from shared.models.page_models import (
     AccessibilityIssue, AccessibilitySnapshot, InteractiveElement,
     PageData, PerformanceMetrics,
@@ -78,6 +79,19 @@ class PlaywrightEngine:
         page.on("requestfinished", lambda req: network_requests.append({
             "url": req.url, "method": req.method,
         }))
+
+        # Report every response to SessionMonitor (tracks 401/403 + logout redirects)
+        def _on_response(response):
+            _monitor.report_request(response.status, response.url)
+
+        def _on_request(request):
+            # Detect redirects: if a request has a redirected-from, report it
+            redirected_from = request.redirected_from
+            if redirected_from:
+                _monitor.report_redirect(redirected_from.url, request.url)
+
+        page.on("response", _on_response)
+        page.on("request", _on_request)
 
         start_time = time.time()
         try:

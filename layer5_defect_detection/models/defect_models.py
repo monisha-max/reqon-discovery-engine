@@ -23,6 +23,9 @@ class DefectCategory(str, Enum):
     LAYOUT_DRIFT = "layout_drift"
     CONTRAST = "contrast"
     FORM_COLLISION = "form_collision"
+    BROKEN_LINK = "broken_link"
+    CONSOLE_ERROR = "console_error"
+    NETWORK_FAILURE = "network_failure"
 
 
 class BoundingBox(BaseModel):

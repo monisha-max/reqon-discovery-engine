@@ -34,6 +34,8 @@ from layer3_performance.models.perf_models import (
     DiscoveredEndpoint,
     EndpointMetrics,
     PerfTestRequest,
+    SoakDegradation,
+    SoakTrendPoint,
     TestRunResult,
     TestType,
 )
@@ -79,6 +81,11 @@ class LoadEngine:
         endpoints: list[DiscoveredEndpoint],
     ) -> list[TestRunResult]:
         """Run all requested test types sequentially and return results."""
+
+        # Optional warmup pass before any timed test
+        if request.warmup_requests > 0:
+            await self._run_warmup(request, endpoints)
+
         results = []
         for test_type in request.test_types:
             logger.info("load_engine.starting_test", test_type=test_type.value)
@@ -96,6 +103,43 @@ class LoadEngine:
                 logger.error("load_engine.test_failed", test_type=test_type.value, error=str(e))
 
         return results
+
+    async def _run_warmup(
+        self,
+        request: PerfTestRequest,
+        endpoints: list[DiscoveredEndpoint],
+    ) -> None:
+        """
+        Send warmup_requests sequential GET/HEAD requests to each endpoint
+        to populate server caches before the timed test begins.
+
+        Uses httpx so we don't spin up a full Locust process.
+        """
+        import httpx
+        n = request.warmup_requests
+        logger.info("load_engine.warmup_start", requests_per_endpoint=n, endpoints=len(endpoints))
+
+        headers = dict(self.auth_headers)
+        async with httpx.AsyncClient(
+            base_url=self.base_url,
+            headers=headers,
+            timeout=10.0,
+            follow_redirects=True,
+        ) as client:
+            for ep in endpoints:
+                path = ep.path_template
+                # Replace {param} placeholders with a safe literal value
+                path = path.replace("{id}", "1").replace("{uuid}", "00000000-0000-0000-0000-000000000001")
+                # Only warm up GET endpoints (avoid side effects on POST/PUT)
+                if ep.method not in ("GET", "HEAD"):
+                    continue
+                for _ in range(n):
+                    try:
+                        await client.get(path)
+                    except Exception:
+                        pass  # Warmup failures are non-fatal
+
+        logger.info("load_engine.warmup_complete")
 
     # ------------------------------------------------------------------
     # Core Subprocess Runner
@@ -186,13 +230,23 @@ class LoadEngine:
         elapsed = time.time() - start_time
 
         # Parse CSV output
-        return self._parse_csv_results(
+        result = self._parse_csv_results(
             csv_prefix=csv_prefix,
             test_type=test_type,
             peak_users=users,
             spawn_rate=spawn_rate,
             duration=int(elapsed),
         )
+
+        # For soak tests: enrich with time-series degradation analysis
+        if test_type == TestType.SOAK:
+            history_file = f"{csv_prefix}_stats_history.csv"
+            if os.path.exists(history_file):
+                result.soak_trend, result.soak_degradations = (
+                    self._analyze_soak_history(history_file)
+                )
+
+        return result
 
     # ------------------------------------------------------------------
     # CSV Parsing
@@ -317,6 +371,126 @@ class LoadEngine:
         except Exception as e:
             logger.warning("load_engine.failures_parse_error", error=str(e))
         return failure_map
+
+    # ------------------------------------------------------------------
+    # Soak Degradation Analysis
+    # ------------------------------------------------------------------
+
+    def _analyze_soak_history(
+        self, history_file: str
+    ) -> tuple[list[SoakTrendPoint], list[SoakDegradation]]:
+        """
+        Parse Locust _stats_history.csv and detect time-series degradation.
+
+        Returns (trend_points, degradation_list).
+        Degradation is detected when the linear slope of p95 exceeds
+        _SOAK_P95_SLOPE_THRESHOLD_MS_PER_MIN (default: 50ms/min).
+        """
+        _SOAK_P95_SLOPE_THRESHOLD = 50.0   # ms per minute = degrading
+
+        # Build per-endpoint time series: {method:name → [(ts, p95, p99, rps, err_rate)]}
+        series: dict[str, list[tuple[float, float, float, float, float]]] = {}
+
+        try:
+            with open(history_file, newline="", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    name = row.get("Name", "").strip()
+                    if not name or name.lower() == "aggregated":
+                        continue
+                    method = row.get("Type", "GET").strip()
+
+                    # History CSV uses Unix timestamp or elapsed seconds
+                    ts_raw = row.get("Timestamp", "0")
+                    try:
+                        ts = float(ts_raw)
+                    except ValueError:
+                        continue
+
+                    p95  = self._safe_float(row.get("95%", "0"))
+                    p99  = self._safe_float(row.get("99%", "0"))
+                    rps  = self._safe_float(row.get("Requests/s", "0"))
+
+                    req_count = self._safe_int(row.get("Request Count", "0"))
+                    fail_count = self._safe_int(row.get("Failure Count", "0"))
+                    err_rate = fail_count / req_count if req_count > 0 else 0.0
+
+                    key = f"{method}:{name}"
+                    series.setdefault(key, []).append((ts, p95, p99, rps, err_rate))
+
+        except Exception as exc:
+            logger.warning("load_engine.history_parse_failed", error=str(exc))
+            return [], []
+
+        # Build aggregate trend (all endpoints combined, by timestamp)
+        ts_map: dict[float, list[float]] = {}
+        for pts in series.values():
+            for ts, p95, p99, rps, _ in pts:
+                ts_map.setdefault(ts, []).append(p95)
+
+        trend_points = [
+            SoakTrendPoint(timestamp=ts, p95_ms=round(sum(vals)/len(vals), 1))
+            for ts, vals in sorted(ts_map.items())
+        ]
+
+        # Per-endpoint degradation via linear regression
+        degradations: list[SoakDegradation] = []
+        for key, pts in series.items():
+            if len(pts) < 4:
+                continue
+            method, _, name = key.partition(":")
+            pts.sort(key=lambda x: x[0])
+            ts0 = pts[0][0]
+            # x = minutes elapsed, y = p95
+            xs = [(p[0] - ts0) / 60.0 for p in pts]
+            ys = [p[1] for p in pts]
+
+            slope = self._linear_slope(xs, ys)   # ms/minute
+
+            start_p95 = ys[0]
+            end_p95   = ys[-1]
+            is_degrading = slope > _SOAK_P95_SLOPE_THRESHOLD
+
+            if is_degrading or slope > 10.0:  # also record moderate slopes for context
+                summary = (
+                    f"p95 increased at {slope:.1f}ms/min over the soak test "
+                    f"({start_p95:.0f}ms → {end_p95:.0f}ms). "
+                    + ("Indicates memory leak or connection pool exhaustion." if is_degrading else "Minor upward trend.")
+                )
+                degradations.append(SoakDegradation(
+                    endpoint=name,
+                    method=method,
+                    p95_slope_ms_per_min=round(slope, 2),
+                    p99_slope_ms_per_min=round(
+                        self._linear_slope(xs, [p[2] for p in pts]), 2
+                    ),
+                    start_p95_ms=round(start_p95, 1),
+                    end_p95_ms=round(end_p95, 1),
+                    is_degrading=is_degrading,
+                    degradation_summary=summary,
+                ))
+
+        logger.info(
+            "load_engine.soak_analysis_done",
+            trend_points=len(trend_points),
+            degrading=sum(1 for d in degradations if d.is_degrading),
+        )
+        return trend_points, degradations
+
+    @staticmethod
+    def _linear_slope(xs: list[float], ys: list[float]) -> float:
+        """Compute slope of the best-fit line (least squares) for lists xs, ys."""
+        n = len(xs)
+        if n < 2:
+            return 0.0
+        sum_x  = sum(xs)
+        sum_y  = sum(ys)
+        sum_xy = sum(x * y for x, y in zip(xs, ys))
+        sum_x2 = sum(x * x for x in xs)
+        denom  = n * sum_x2 - sum_x ** 2
+        if denom == 0:
+            return 0.0
+        return (n * sum_xy - sum_x * sum_y) / denom
 
     # ------------------------------------------------------------------
     # Helpers
