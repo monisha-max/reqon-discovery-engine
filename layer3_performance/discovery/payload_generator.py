@@ -69,29 +69,22 @@ class PayloadGenerator:
     # ------------------------------------------------------------------
 
     async def _llm_generate_batch(self, endpoints: list[DiscoveredEndpoint]):
-        """Use GPT-4o-mini to generate realistic payloads for all body endpoints."""
-        from config.settings import settings
-        if not settings.OPENAI_API_KEY:
-            return
+        """Generate realistic payloads using OpenAI (with Anthropic fallback)."""
+        from layer3_performance.llm_client import call_llm
 
-        try:
-            from openai import AsyncOpenAI
-            client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        ep_descriptions = []
+        for i, ep in enumerate(endpoints):
+            desc = {
+                "index": i,
+                "method": ep.method,
+                "path": ep.path_template,
+                "description": ep.description or "",
+            }
+            if ep.request_schema:
+                desc["schema"] = ep.request_schema
+            ep_descriptions.append(desc)
 
-            # Build compact endpoint descriptions for the prompt
-            ep_descriptions = []
-            for i, ep in enumerate(endpoints):
-                desc = {
-                    "index": i,
-                    "method": ep.method,
-                    "path": ep.path_template,
-                    "description": ep.description or "",
-                }
-                if ep.request_schema:
-                    desc["schema"] = ep.request_schema
-                ep_descriptions.append(desc)
-
-            prompt = f"""You are a load testing engineer generating realistic API request payloads.
+        prompt = f"""You are a load testing engineer generating realistic API request payloads.
 
 For each endpoint below, generate ONE realistic JSON request body that a real user would submit.
 Use realistic-looking data (real names, valid emails, plausible values — not 'test' or 'string').
@@ -105,28 +98,22 @@ Respond ONLY with a JSON array indexed by the endpoint index (no markdown):
   {{"index": 1, "payload": {{"name": "Product A", "price": 29.99, "category": "electronics"}}}}
 ]"""
 
-            response = await client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.4,
-                max_tokens=1500,
-            )
+        content = await call_llm(prompt, max_tokens=1500, temperature=0.4)
+        if content is None:
+            return
 
-            content = response.choices[0].message.content.strip()
+        try:
             if content.startswith("```"):
                 content = content.split("\n", 1)[1].rsplit("```", 1)[0]
-
             results = json.loads(content)
             for item in results:
                 idx = item.get("index")
                 payload = item.get("payload")
                 if idx is not None and payload and 0 <= idx < len(endpoints):
                     endpoints[idx].sample_payload = payload
-
             logger.info("payload_generator.llm_success", count=len(results))
-
         except Exception as e:
-            logger.warning("payload_generator.llm_failed", error=str(e))
+            logger.warning("payload_generator.llm_parse_failed", error=str(e))
 
     # ------------------------------------------------------------------
     # Schema / Faker Fallback

@@ -17,6 +17,7 @@ and passed as snapshot_artifacts in defect_config.
 from __future__ import annotations
 
 import os
+import re
 import time
 from datetime import datetime, timezone
 from typing import Optional
@@ -24,7 +25,15 @@ from typing import Optional
 import structlog
 
 from layer5_defect_detection.analyzers.contrast_analyzer import ContrastAnalyzer
+from layer5_defect_detection.analyzers.functional_analyzer import FunctionalAnalyzer
 from layer5_defect_detection.analyzers.layout_analyzer import LayoutAnalyzer
+
+# Extra viewports to analyse in addition to the configured desktop viewport.
+# Each entry: (phase_label, viewport_dict)
+_EXTRA_VIEWPORTS: list[tuple[str, dict]] = [
+    ("mobile",  {"width": 375,  "height": 812}),
+    ("tablet",  {"width": 768,  "height": 1024}),
+]
 from layer5_defect_detection.capture.screenshot_capture import ScreenshotCapture
 from layer5_defect_detection.evidence.annotator import Annotator
 from layer5_defect_detection.evidence.evidence_builder import EvidenceBuilder
@@ -87,6 +96,7 @@ async def run_defect_detection(
     normalizer = Normalizer()
     layout_analyzer = LayoutAnalyzer()
     contrast_analyzer = ContrastAnalyzer()
+    functional_analyzer = FunctionalAnalyzer()
     mapper = FindingsMapper()
     annotator = Annotator()
     builder = EvidenceBuilder(run_dir)
@@ -138,7 +148,8 @@ async def run_defect_detection(
                     screenshot_path = norm_path
 
                 # Open a fresh Playwright page for DOM analysis
-                _, page = await capture.capture(phase, url=page_url)
+                # monitor_events=True captures console errors + failed requests
+                _, page = await capture.capture(phase, url=page_url, monitor_events=True)
                 try:
                     masked_regions = await get_masked_regions(page)
                     raw_findings = await layout_analyzer.analyze(
@@ -146,6 +157,15 @@ async def run_defect_detection(
                     )
                     raw_findings.extend(
                         contrast_analyzer.check_elements(layout_analyzer.last_elements, phase)
+                    )
+                    raw_findings.extend(
+                        await functional_analyzer.check_broken_links(page, phase)
+                    )
+                    # Console errors / network failures captured pre-navigation
+                    console_errors = getattr(page, "_reqon_console_errors", [])
+                    failed_requests = getattr(page, "_reqon_failed_requests", [])
+                    raw_findings.extend(
+                        functional_analyzer.check_events(console_errors, failed_requests, phase)
                     )
                 finally:
                     await page.close()
@@ -190,6 +210,30 @@ async def run_defect_detection(
                     captured_at=datetime.now(timezone.utc).isoformat(),
                 ))
 
+            # Run extra viewport analysis (mobile / tablet) on the baseline URL
+            for vp_phase, vp_size in _EXTRA_VIEWPORTS:
+                try:
+                    vp_snapshot = await _analyze_extra_viewport(
+                        page_url=page_url,
+                        page_type=page_type,
+                        slug=slug,
+                        phase_label=vp_phase,
+                        viewport=vp_size,
+                        storage_state_path=storage_state_path,
+                        run_dir=run_dir,
+                        layout_analyzer=layout_analyzer,
+                        contrast_analyzer=contrast_analyzer,
+                        mapper=mapper,
+                        annotator=annotator,
+                    )
+                    if vp_snapshot:
+                        snapshots.append(vp_snapshot)
+                except Exception as exc:
+                    logger.warning(
+                        "defect_orchestrator.extra_viewport_failed",
+                        phase=vp_phase, url=page_url, error=str(exc),
+                    )
+
             comparison = _compare_snapshots(snapshots)
             summary = _build_page_summary(page_url, page_type, slug, priority_reason,
                                           snapshots, comparison)
@@ -219,6 +263,81 @@ async def run_defect_detection(
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+async def _analyze_extra_viewport(
+    page_url: str,
+    page_type: str,
+    slug: str,
+    phase_label: str,
+    viewport: dict,
+    storage_state_path: Optional[str],
+    run_dir: str,
+    layout_analyzer: "LayoutAnalyzer",
+    contrast_analyzer: "ContrastAnalyzer",
+    mapper: "FindingsMapper",
+    annotator: "Annotator",
+) -> Optional[SnapshotReport]:
+    """
+    Run a single layout+contrast analysis pass at an alternative viewport
+    (e.g. mobile 375px, tablet 768px).
+
+    Creates its own short-lived ScreenshotCapture session so it doesn't
+    interfere with the main desktop capture context.
+    """
+    vp_dir = os.path.join(run_dir, slug, phase_label)
+    os.makedirs(vp_dir, exist_ok=True)
+
+    cap = ScreenshotCapture(page_url, storage_state_path, vp_dir, viewport)
+    await cap.start()
+    try:
+        screenshot_path, page = await cap.capture(phase_label, url=page_url)
+        try:
+            masked_regions = await get_masked_regions(page)
+            raw_findings = await layout_analyzer.analyze(
+                page, masked_regions, phase_label, baseline_elements=None
+            )
+            raw_findings.extend(
+                contrast_analyzer.check_elements(layout_analyzer.last_elements, phase_label)
+            )
+        finally:
+            await page.close()
+    finally:
+        await cap.stop()
+
+    findings = mapper.process(raw_findings)
+
+    annotated_path = os.path.join(vp_dir, f"annotated_{phase_label}.png")
+    if findings:
+        annotator.annotate(screenshot_path, findings, annotated_path)
+    else:
+        import shutil
+        shutil.copy2(screenshot_path, annotated_path)
+
+    logger.info(
+        "defect_orchestrator.extra_viewport_done",
+        phase=phase_label,
+        viewport=viewport,
+        url=page_url,
+        findings=len(findings),
+    )
+
+    return SnapshotReport(
+        phase=phase_label,
+        url=page_url,
+        page_type=page_type,
+        page_slug=slug,
+        screenshot_path=screenshot_path,
+        annotated_screenshot_path=annotated_path,
+        viewport_width=viewport["width"],
+        viewport_height=viewport["height"],
+        findings=findings,
+        total_elements_analyzed=len(layout_analyzer.last_elements),
+        dynamic_regions_masked=sum(
+            1 for e in layout_analyzer.last_elements if e.is_dynamic
+        ),
+        captured_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+
 def _compare_snapshots(snapshots: list[SnapshotReport]) -> ComparisonResult:
     baseline = next((s for s in snapshots if s.phase == "baseline"), None)
     if not baseline:
@@ -226,12 +345,16 @@ def _compare_snapshots(snapshots: list[SnapshotReport]) -> ComparisonResult:
 
     baseline_fps = {_fingerprint(f) for f in baseline.findings}
     regression_defects: list[RegressionDefect] = []
+    # Deduplicate: same defect introduced in peak AND post → report once only
+    seen_regression_fps: set[str] = set()
 
     for snapshot in snapshots:
         if snapshot.phase == "baseline":
             continue
         for finding in snapshot.findings:
-            if _fingerprint(finding) not in baseline_fps:
+            fp = _fingerprint(finding)
+            if fp not in baseline_fps and fp not in seen_regression_fps:
+                seen_regression_fps.add(fp)
                 regression_defects.append(RegressionDefect(
                     defect=finding,
                     introduced_at_phase=snapshot.phase,
@@ -255,7 +378,22 @@ def _compare_snapshots(snapshots: list[SnapshotReport]) -> ComparisonResult:
 
 
 def _fingerprint(f: DefectFinding) -> str:
-    return f"{f.category.value}::{f.element_selector}"
+    """
+    Stable fingerprint for a finding that survives DOM reordering between phases.
+
+    Uses category + bbox bucketed to 20px grid + first 30 chars of text/selector.
+    Bucketing absorbs minor layout drift without treating the same element as new.
+    """
+    bbox = f.element_bbox
+    if bbox:
+        bx = round(bbox.x / 20) * 20
+        by = round(bbox.y / 20) * 20
+        pos = f"{bx},{by}"
+    else:
+        pos = "nopos"
+    # Use selector as tiebreaker but strip volatile nth-of-type suffixes
+    sel = re.sub(r":nth-of-type\(\d+\)", "", f.element_selector or "")
+    return f"{f.category.value}::{pos}::{sel[:40]}"
 
 
 def _build_page_summary(

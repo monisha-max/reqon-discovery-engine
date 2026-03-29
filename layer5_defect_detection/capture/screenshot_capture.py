@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import os
 import time
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import structlog
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
@@ -81,13 +81,39 @@ class ScreenshotCapture:
             self._browser = None
             self._playwright = None
 
-    async def capture(self, phase: str, url: Optional[str] = None) -> tuple[str, Page]:
+    async def capture(
+        self,
+        phase: str,
+        url: Optional[str] = None,
+        monitor_events: bool = False,
+    ) -> tuple[str, Page]:
         """
         Navigate to url (or target_url), take a full-page screenshot, return
         (screenshot_path, live_page). Caller MUST close the page when done.
+
+        If monitor_events=True, console errors and failed requests are attached
+        to page._reqon_console_errors and page._reqon_failed_requests so the
+        caller can retrieve them after navigation.
         """
         nav_url = url or self.target_url
         page: Page = await self._context.new_page()
+
+        if monitor_events:
+            page._reqon_console_errors: list[str] = []
+            page._reqon_failed_requests: list[dict] = []
+
+            def _on_console(msg: Any) -> None:
+                if msg.type == "error":
+                    page._reqon_console_errors.append(msg.text)
+
+            def _on_requestfailed(request: Any) -> None:
+                page._reqon_failed_requests.append({
+                    "url": request.url,
+                    "failure_text": request.failure or "unknown",
+                })
+
+            page.on("console", _on_console)
+            page.on("requestfailed", _on_requestfailed)
 
         try:
             await page.goto(nav_url, wait_until="networkidle", timeout=30_000)

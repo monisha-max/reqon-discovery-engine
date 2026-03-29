@@ -11,7 +11,10 @@ Called by the LangGraph perf_test_node after the crawl is complete.
 """
 from __future__ import annotations
 
+import json
+import os
 import time
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
@@ -26,6 +29,7 @@ from layer3_performance.models.perf_models import (
     PerfTestRequest,
     TestType,
 )
+from layer3_performance.report.html_report import build_html_report
 
 logger = structlog.get_logger()
 
@@ -100,6 +104,7 @@ async def run_performance_tests(
         endpoints=endpoints,
         base_url=request.target_url,
         auth_headers=request.auth_headers or None,
+        storage_state_path=request.storage_state_path,
     )
 
     # ------------------------------------------------------------------
@@ -124,11 +129,34 @@ async def run_performance_tests(
         start_time=start_time,
     )
 
+    # ------------------------------------------------------------------
+    # Step 6: Persist result to disk
+    # ------------------------------------------------------------------
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    result_dir = os.path.join(output_dir, "perf_reports")
+    os.makedirs(result_dir, exist_ok=True)
+    result_path = os.path.join(result_dir, f"perf_{run_id}.json")
+    try:
+        with open(result_path, "w", encoding="utf-8") as fh:
+            json.dump(result.model_dump(), fh, indent=2, default=str)
+        logger.info("perf_orchestrator.result_saved", path=result_path)
+    except Exception as exc:
+        logger.warning("perf_orchestrator.result_save_failed", error=str(exc))
+
+    # HTML report
+    try:
+        html_path = build_html_report(result, result_dir)
+        result.report_path = html_path
+        logger.info("perf_orchestrator.html_report_saved", path=html_path)
+    except Exception as exc:
+        logger.warning("perf_orchestrator.html_report_failed", error=str(exc))
+
     logger.info(
         "perf_orchestrator.complete",
         endpoints_tested=result.endpoints_tested,
         bottlenecks=len(result.bottlenecks),
         duration_s=result.total_duration_seconds,
+        result_path=result_path,
     )
 
     return result

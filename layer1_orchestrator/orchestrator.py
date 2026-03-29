@@ -79,7 +79,14 @@ class GraphState(TypedDict, total=False):
 def should_auth(state: GraphState) -> str:
     """Conditional edge: decide whether to run auth before crawling."""
     plan = state.get("plan", {})
-    if plan.get("needs_auth", False):
+    needs_auth = plan.get("needs_auth", False)
+    auth_config = state.get("request", {}).get("auth_config")
+    logger.info(
+        "orchestrator.auth_decision",
+        needs_auth=needs_auth,
+        has_auth_config=auth_config is not None,
+    )
+    if needs_auth:
         logger.info("orchestrator.routing_to_auth")
         return "auth"
     logger.info("orchestrator.skipping_auth")

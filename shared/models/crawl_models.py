@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
+from typing import Any, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -14,13 +14,16 @@ class CrawlScope(str, Enum):
 
 class AuthConfig(BaseModel):
     """Authentication configuration provided by the user."""
-    auth_type: Optional[str] = None  # "form", "cookie", "token", "none"
+    auth_type: Optional[str] = None  # "form", "cookie", "token", "cookie_replay", "none"
     login_url: Optional[str] = None
     username: Optional[str] = None
     password: Optional[str] = None
-    cookies: Optional[dict] = None
+    # cookies can be a list of Playwright cookie dicts [{"name":..,"value":..,"domain":..}]
+    # or a plain {name: value} dict (legacy format)
+    cookies: Optional[Union[List[dict], dict]] = None
     token: Optional[str] = None
     storage_state_path: Optional[str] = None
+    target_url: Optional[str] = None   # used by cookie_replay to build storage state path
 
 
 class CrawlRequest(BaseModel):
