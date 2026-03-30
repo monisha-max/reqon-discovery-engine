@@ -132,7 +132,7 @@ class ScanRequest(BaseModel):
     max_depth: int = Field(default=5, ge=1, le=20)
     enable_perf: bool = True
     enable_defect: bool = True
-    test_types: list[str] = Field(default_factory=lambda: ["load"])
+    test_types: list[str] = Field(default_factory=lambda: ["load", "stress", "soak"])
 
 
 class ScanStarted(BaseModel):
@@ -187,8 +187,15 @@ async def start_scan(body: ScanRequest) -> ScanStarted:
     if body.enable_perf:
         perf_config = {
             "test_types": body.test_types,
+            # Load
             "load_users": 20,
             "load_duration_seconds": 120,
+            # Stress — scaled down from CLI defaults for web UI sessions
+            "stress_max_users": 50,
+            "stress_duration_seconds": 120,
+            # Soak — short duration suitable for a UI-triggered scan
+            "soak_users": 10,
+            "soak_duration_seconds": 300,
         }
 
     defect_config: Optional[dict[str, Any]] = None
