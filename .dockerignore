@@ -7,5 +7,4 @@ venv
 output/
 .DS_Store
 .claude/
-*.md
 tests/
