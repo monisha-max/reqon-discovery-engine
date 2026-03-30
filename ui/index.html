@@ -639,6 +639,81 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .sev-medium { background: #2d1c0a; color: var(--warn); border: 1px solid #4a2e0e; }
 .sev-low { background: #0d1f14; color: var(--success); border: 1px solid #143320; }
 
+/* ── A11y section ────────────────────────────────── */
+.a11y-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.a11y-header h3 { margin: 0; padding: 0; border: none; flex: 1; }
+.a11y-badge {
+  font-size: 0.68rem; font-weight: 700; padding: 4px 10px;
+  border-radius: 20px; background: #0d1a2d; color: #60a5fa;
+  border: 1px solid #1e3a5f; text-transform: uppercase; letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.a11y-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.a11y-stat {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+}
+.a11y-stat .a11y-num { font-size: 1.5rem; font-weight: 800; }
+.a11y-stat .a11y-lbl { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 3px; }
+.a11y-num.crit { color: var(--error); }
+.a11y-num.hi   { color: #f97316; }
+.a11y-num.med  { color: var(--warn); }
+.a11y-num.lo   { color: var(--success); }
+
+.a11y-summary-box {
+  background: #0a1628;
+  border: 1px solid #1e3a5f;
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  font-size: 0.87rem;
+  color: #c8d8f0;
+  line-height: 1.7;
+}
+.a11y-summary-box .summary-label {
+  font-size: 0.68rem; font-weight: 700; color: #60a5fa;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  display: block; margin-bottom: 7px;
+}
+.wcag-rules {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-bottom: 16px;
+}
+.wcag-chip {
+  font-size: 0.72rem; font-family: monospace;
+  background: #111827; border: 1px solid #2d3748;
+  color: #9ca3af; padding: 3px 9px; border-radius: 6px;
+}
+.a11y-finding-row {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 0.84rem;
+}
+.a11y-finding-row:last-child { border-bottom: none; }
+.a11y-rule-id {
+  font-family: monospace; font-size: 0.72rem;
+  color: #60a5fa; white-space: nowrap; flex-shrink: 0; padding-top: 2px;
+}
+.a11y-selector {
+  font-family: monospace; font-size: 0.72rem;
+  color: var(--muted); display: block; margin-top: 3px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 340px;
+}
+
 /* ── Bottleneck / rec items ───────────────────────── */
 .bottleneck-item {
   background: #1a0f0f;
@@ -1246,6 +1321,10 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
         <div class="stat-num" id="res-defects">—</div>
         <div class="stat-lbl">Defects</div>
       </div>
+      <div class="stat-mini" title="WCAG 2.1 accessibility violations found by axe-core">
+        <div class="stat-num" id="res-a11y" style="color:#60a5fa;">—</div>
+        <div class="stat-lbl">A11y</div>
+      </div>
       <div class="stat-mini" title="API endpoints that fail under load">
         <div class="stat-num" id="res-bottlenecks">—</div>
         <div class="stat-lbl">Bottlenecks</div>
@@ -1346,6 +1425,49 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
       <h3>Top Defects</h3>
       <p style="font-size:0.82rem;color:var(--muted);margin:-4px 0 14px;">Visual, accessibility, and functional defects detected by analyzing the live DOM, layout geometry, and network telemetry. Each finding includes the exact element and evidence for quick reproduction.</p>
       <div id="defects-list"></div>
+    </div>
+
+    <div class="section-block" id="a11y-section" style="display:none;">
+      <div class="a11y-header">
+        <h3>Accessibility Audit</h3>
+        <span class="a11y-badge">WCAG 2.1 · axe-core</span>
+      </div>
+
+      <!-- Severity breakdown -->
+      <div class="a11y-stats">
+        <div class="a11y-stat">
+          <div class="a11y-num crit" id="a11y-crit">0</div>
+          <div class="a11y-lbl">Critical</div>
+        </div>
+        <div class="a11y-stat">
+          <div class="a11y-num hi" id="a11y-high">0</div>
+          <div class="a11y-lbl">High</div>
+        </div>
+        <div class="a11y-stat">
+          <div class="a11y-num med" id="a11y-med">0</div>
+          <div class="a11y-lbl">Medium</div>
+        </div>
+        <div class="a11y-stat">
+          <div class="a11y-num lo" id="a11y-low">0</div>
+          <div class="a11y-lbl">Low</div>
+        </div>
+      </div>
+
+      <!-- LLM-generated summary -->
+      <div class="a11y-summary-box" id="a11y-summary-box" style="display:none;">
+        <span class="summary-label">AI Accessibility Analysis</span>
+        <span id="a11y-summary-text"></span>
+      </div>
+
+      <!-- WCAG rules triggered -->
+      <div id="a11y-rules-wrap" style="display:none;margin-bottom:4px;">
+        <p style="font-size:0.72rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em;font-weight:700;">Rules Triggered</p>
+        <div class="wcag-rules" id="a11y-rules"></div>
+      </div>
+
+      <!-- Top violations -->
+      <p style="font-size:0.72rem;color:var(--muted);margin:12px 0 8px;text-transform:uppercase;letter-spacing:0.05em;font-weight:700;">Top Violations</p>
+      <div id="a11y-findings-list"></div>
     </div>
 
     <div class="section-block" id="perf-section" style="display:none;">
@@ -1720,6 +1842,58 @@ async function _renderResult(result, statusData) {
     }
   } else {
     document.getElementById('res-defects').textContent = '—';
+  }
+
+  // ── Accessibility section ──────────────────────────
+  const a11y = defect && defect.a11y;
+  if (a11y && a11y.total > 0) {
+    document.getElementById('res-a11y').textContent = a11y.total;
+    document.getElementById('a11y-section').style.display = 'block';
+    document.getElementById('a11y-crit').textContent = a11y.critical || 0;
+    document.getElementById('a11y-high').textContent = a11y.high    || 0;
+    document.getElementById('a11y-med').textContent  = a11y.medium  || 0;
+    document.getElementById('a11y-low').textContent  = a11y.low     || 0;
+
+    // LLM summary
+    if (a11y.llm_summary) {
+      document.getElementById('a11y-summary-box').style.display = 'block';
+      document.getElementById('a11y-summary-text').textContent = a11y.llm_summary;
+    }
+
+    // WCAG rule chips
+    if (a11y.wcag_rules && a11y.wcag_rules.length) {
+      document.getElementById('a11y-rules-wrap').style.display = 'block';
+      document.getElementById('a11y-rules').innerHTML =
+        a11y.wcag_rules.map(r => `<span class="wcag-chip">${_esc(r)}</span>`).join('');
+    }
+
+    // Top violations
+    const findingsEl = document.getElementById('a11y-findings-list');
+    if (a11y.top_findings && a11y.top_findings.length) {
+      findingsEl.innerHTML = a11y.top_findings.map(f => {
+        const ruleId = (f.title || '').match(/\[axe\/([^\]]+)\]/)?.[1] || f.category;
+        return `
+        <div class="a11y-finding-row">
+          <span class="sev-badge sev-${(f.severity||'low').toLowerCase()}">${f.severity||'low'}</span>
+          <span style="flex:1;min-width:0;">
+            <span class="a11y-rule-id">${_esc(ruleId)}</span>
+            <strong style="color:var(--text);display:block;margin-top:2px;">${_esc((f.title||'').replace(/^\[axe\/[^\]]+\]\s*/,''))}</strong>
+            <span style="color:#9ca3af;font-size:0.8rem;">${_esc(f.description ? f.description.split('|')[0].trim() : '')}</span>
+            ${f.selector ? `<span class="a11y-selector">${_esc(f.selector)}</span>` : ''}
+            <span style="color:var(--muted);font-size:0.75rem;display:block;margin-top:2px;">${_esc(f.url)}</span>
+          </span>
+        </div>`;
+      }).join('');
+    } else {
+      findingsEl.innerHTML = '<p class="empty-state">No detailed findings available.</p>';
+    }
+  } else {
+    document.getElementById('res-a11y').textContent = a11y ? '0' : '—';
+    if (a11y) {
+      document.getElementById('a11y-section').style.display = 'block';
+      document.getElementById('a11y-findings-list').innerHTML =
+        '<p class="empty-state">No accessibility violations detected. Great work!</p>';
+    }
   }
 
   const perf = result.perf_result;

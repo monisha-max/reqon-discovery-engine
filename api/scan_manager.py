@@ -238,7 +238,7 @@ async def run_scan(scan_id: str) -> None:
         auth_config = None              # clear on success path
 
         # Extract a safe, credential-free summary from final_state
-        record.result = _safe_result(final_state)
+        record.result = await _safe_result(final_state)
         try:
             intelligence_result = process_final_state(
                 final_state,
@@ -324,7 +324,7 @@ def get_scan_result(scan_id: str) -> Optional[dict]:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _safe_result(final_state: dict) -> dict:
+async def _safe_result(final_state: dict) -> dict:
     """
     Extract a serialisable, credential-free summary from the orchestrator state.
     Never reads _auth_config — it has already been cleared.
@@ -375,6 +375,32 @@ def _safe_result(final_state: dict) -> dict:
             else:
                 sev_counts["info"] += 1
 
+        # A11y-specific findings: axe-core findings have titles starting with [axe/
+        _A11Y_CATEGORIES = {
+            "accessibility", "aria_violation", "missing_alt_text",
+            "form_integrity", "dom_structural", "contrast",
+            "empty_interactive",
+        }
+        a11y_findings = [
+            f for f in findings
+            if (f.get("title", "").startswith("[axe/")
+                or f.get("category", "") in _A11Y_CATEGORIES)
+        ]
+        a11y_sev = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+        for f in a11y_findings:
+            sev = (f.get("severity") or "info").lower()
+            a11y_sev[sev] = a11y_sev.get(sev, 0) + 1
+
+        # Unique WCAG rule IDs found
+        wcag_rules = sorted({
+            f.get("title", "").split("]")[0].lstrip("[axe/")
+            for f in a11y_findings
+            if f.get("title", "").startswith("[axe/")
+        })
+
+        # LLM accessibility summary
+        a11y_llm_summary = await _generate_a11y_summary(a11y_findings, result.get("target_url", ""))
+
         defect_summary = {
             "total_findings": defect_result.get("total_defects", len(findings)),
             "critical_count": sev_counts["critical"],
@@ -392,6 +418,26 @@ def _safe_result(final_state: dict) -> dict:
                 }
                 for f in findings[:10]
             ],
+            "a11y": {
+                "total": len(a11y_findings),
+                "critical": a11y_sev["critical"],
+                "high": a11y_sev["high"],
+                "medium": a11y_sev["medium"],
+                "low": a11y_sev["low"],
+                "wcag_rules": wcag_rules[:20],
+                "top_findings": [
+                    {
+                        "title": f.get("title", ""),
+                        "category": f.get("category", ""),
+                        "severity": f.get("severity", ""),
+                        "description": f.get("description", ""),
+                        "selector": f.get("element_selector", ""),
+                        "url": f.get("url", ""),
+                    }
+                    for f in a11y_findings[:12]
+                ],
+                "llm_summary": a11y_llm_summary,
+            },
         }
 
     # Coverage score from result dict
@@ -407,6 +453,40 @@ def _safe_result(final_state: dict) -> dict:
         "defect_result": defect_summary,
         "errors": errors[:20],
     }
+
+
+async def _generate_a11y_summary(a11y_findings: list[dict], target_url: str) -> str:
+    """Call the LLM to produce a plain-English accessibility audit summary."""
+    if not a11y_findings:
+        return "No accessibility violations detected by axe-core WCAG 2.1 checks."
+
+    try:
+        from layer3_performance.llm_client import call_llm
+
+        # Build a compact finding digest for the prompt
+        digest_lines = []
+        for f in a11y_findings[:15]:
+            title = f.get("title", "")
+            sev = f.get("severity", "low").upper()
+            sel = f.get("element_selector", "")[:80]
+            digest_lines.append(f"  [{sev}] {title} — {sel}")
+        digest = "\n".join(digest_lines)
+
+        prompt = f"""You are an accessibility expert reviewing a WCAG 2.1 audit for {target_url}.
+
+The following violations were detected by axe-core:
+{digest}
+
+Write a concise (3–5 sentences) plain-English summary for a developer dashboard that:
+1. States overall accessibility health (good / needs work / critical issues)
+2. Highlights the most impactful violations and which user groups are affected
+3. Gives the single most important fix to prioritize
+Keep it factual, actionable, and jargon-light."""
+
+        summary = await call_llm(prompt, max_tokens=250, temperature=0.3)
+        return summary or "Accessibility analysis complete. Review findings below."
+    except Exception:
+        return "Accessibility analysis complete. Review findings below."
 
 
 def _safe_intelligence(intelligence_result: dict) -> dict:
