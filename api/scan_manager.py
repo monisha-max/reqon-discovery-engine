@@ -18,6 +18,7 @@ from typing import Any, Optional
 
 import structlog
 
+from intelligence.services.runtime import process_final_state
 from layer1_orchestrator.orchestrator import run_orchestrator
 
 # ---------------------------------------------------------------------------
@@ -238,6 +239,30 @@ async def run_scan(scan_id: str) -> None:
 
         # Extract a safe, credential-free summary from final_state
         record.result = _safe_result(final_state)
+        try:
+            intelligence_result = process_final_state(
+                final_state,
+                target_url=record.target_url,
+                scan_id=scan_id,
+            )
+            record.result["application_name"] = intelligence_result.get("application_name", "")
+            record.result["application_key"] = intelligence_result.get("application_key", "")
+            record.result["intelligence"] = _safe_intelligence(intelligence_result)
+        except Exception as exc:
+            structlog.get_logger().warning(
+                "scan_manager.intelligence_degraded",
+                scan_id=scan_id,
+                error=str(exc),
+            )
+            record.result["intelligence"] = {
+                "status": "degraded",
+                "error_message": str(exc),
+                "application_score": None,
+                "page_scores": [],
+                "lifecycle_summary": None,
+                "page_summaries": [],
+                "top_priorities": [],
+            }
         record.pages_found = len(final_state.get("pages") or [])
         record.status = "done"
         record.phase = "complete"
@@ -326,10 +351,16 @@ def _safe_result(final_state: dict) -> dict:
     # Defect summary
     defect_summary = None
     if defect_result and isinstance(defect_result, dict):
-        findings = defect_result.get("findings") or []
+        findings = []
+        for page_summary in defect_result.get("pages_analyzed") or []:
+            for snapshot in page_summary.get("snapshots") or []:
+                for finding in snapshot.get("findings") or []:
+                    enriched_finding = dict(finding)
+                    enriched_finding.setdefault("url", page_summary.get("url", ""))
+                    findings.append(enriched_finding)
         defect_summary = {
-            "total_findings": len(findings),
-            "critical": sum(1 for f in findings if f.get("severity") in ("critical", "high")),
+            "total_findings": defect_result.get("total_defects", len(findings)),
+            "critical": defect_result.get("critical_count", 0) + defect_result.get("high_count", 0),
             "report_path": defect_result.get("report_path", ""),
             "top_findings": [
                 {
@@ -345,12 +376,27 @@ def _safe_result(final_state: dict) -> dict:
     # Coverage score from result dict
     coverage_score = result.get("coverage_score", 0)
 
+    request_data = final_state.get("request") or {}
     return {
-        "target_url": final_state.get("target_url", ""),
+        "target_url": result.get("target_url", request_data.get("target_url", "")),
         "pages_crawled": len(pages),
         "pages": pages_summary,
         "coverage_score": coverage_score,
         "perf_result": perf_summary,
         "defect_result": defect_summary,
         "errors": errors[:20],
+    }
+
+
+def _safe_intelligence(intelligence_result: dict) -> dict:
+    return {
+        "status": "ok",
+        "application_score": intelligence_result.get("application_score"),
+        "application_grade": (intelligence_result.get("application_score") or {}).get("grade"),
+        "risk_class": (intelligence_result.get("application_score") or {}).get("risk_class"),
+        "trend_indicator": (intelligence_result.get("application_score") or {}).get("trend_indicator"),
+        "lifecycle_summary": intelligence_result.get("lifecycle_summary"),
+        "page_scores": intelligence_result.get("page_scores", []),
+        "page_summaries": intelligence_result.get("page_summaries", []),
+        "top_priorities": intelligence_result.get("top_priorities", []),
     }
