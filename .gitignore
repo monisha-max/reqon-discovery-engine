@@ -7,6 +7,9 @@ venv/
 
 # Output (screenshots, models, training data)
 output/
+.crawl4ai/
+server_stdout.log
+server_stderr.log
 
 # IDE
 .vscode/

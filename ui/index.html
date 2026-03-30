@@ -643,6 +643,70 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
         <div class="big-num" id="res-coverage">—</div>
         <div class="card-lbl">Coverage Score</div>
       </div>
+      <div class=”result-card”>
+        <div class=”big-num” id=”res-app-score”>—</div>
+        <div class=”card-lbl”>Application Score</div>
+      </div>
+      <div class=”result-card”>
+        <div class=”big-num” id=”res-grade”>—</div>
+        <div class=”card-lbl”>Grade</div>
+      </div>
+      <div class=”result-card”>
+        <div class=”big-num” id=”res-risk”>—</div>
+        <div class=”card-lbl”>Risk Class</div>
+      </div>
+      <div class=”result-card”>
+        <div class=”big-num” id=”res-trend”>—</div>
+        <div class=”card-lbl”>Trend</div>
+      </div>
+      <div class=”result-card”>
+        <div class=”big-num” id=”res-new”>—</div>
+        <div class=”card-lbl”>New Issues</div>
+      </div>
+      <div class=”result-card”>
+        <div class=”big-num” id=”res-recurring”>—</div>
+        <div class=”card-lbl”>Recurring</div>
+      </div>
+      <div class=”result-card”>
+        <div class=”big-num” id=”res-resolved”>—</div>
+        <div class=”card-lbl”>Resolved</div>
+      </div>
+      <div class=”result-card”>
+        <div class=”big-num” id=”res-regressions”>—</div>
+        <div class=”card-lbl”>Regressions</div>
+      </div>
+    </div>
+
+    <div class=”section-block” id=”intelligence-section” style=”display:none;”>
+      <h3>Intelligence Summary</h3>
+      <div id=”intelligence-banner” class=”empty-state” style=”display:none;margin-bottom:14px;”></div>
+      <div id=”priorities-list”></div>
+      <div id=”page-scores-table” style=”margin-top:16px;”></div>
+    </div>
+
+    <div class=”section-block” id=”history-section” style=”display:none;”>
+      <h3>History</h3>
+      <div style=”margin-bottom:16px;”>
+        <strong style=”font-size:0.85rem;color:#a0aec0;”>Application History</strong>
+        <div id=”application-history-list” style=”margin-top:10px;”></div>
+      </div>
+      <div style=”margin-bottom:16px;”>
+        <strong style=”font-size:0.85rem;color:#a0aec0;”>Page History</strong>
+        <div style=”margin-top:10px;margin-bottom:10px;”>
+          <select id=”page-history-select” style=”width:100%;padding:10px;border-radius:10px;background:var(--surface2);color:#fff;border:1px solid var(--border);”>
+            <option value=””>Select a page</option>
+          </select>
+        </div>
+        <div id=”page-history-list”></div>
+      </div>
+      <div style=”margin-bottom:16px;”>
+        <strong style=”font-size:0.85rem;color:#a0aec0;”>Audit Log</strong>
+        <div id=”audit-list” style=”margin-top:10px;”></div>
+      </div>
+      <div>
+        <strong style=”font-size:0.85rem;color:#a0aec0;”>Recent Events</strong>
+        <div id=”event-list” style=”margin-top:10px;”></div>
+      </div>
     </div>
 
     <!-- Defect findings -->
@@ -951,7 +1015,7 @@ async function _fetchResult() {
     const rr = await fetch(`/api/scan/${_scanId}/result`);
     if (!rr.ok) return;
     const result = await rr.json();
-    _renderResult(result, statusData);
+    await _renderResult(result, statusData);
   } catch(e) {
     _renderError('Failed to fetch results: ' + e.message);
   }
@@ -965,7 +1029,7 @@ function _renderError(msg) {
   showView('view-results');
 }
 
-function _renderResult(result, statusData) {
+async function _renderResult(result, statusData) {
   document.getElementById('results-target').textContent = result.target_url || '';
   document.getElementById('error-banner').style.display = 'none';
 
@@ -1070,6 +1134,7 @@ function _renderResult(result, statusData) {
     document.getElementById('res-bottlenecks').textContent = '—';
   }
 
+  await _renderIntelligence(result);
   _updatePhaseBar('complete');
   showView('view-results');
 }
@@ -1077,6 +1142,151 @@ function _renderResult(result, statusData) {
 // ─────────────────────────────────────────────────────────────────────────
 // Cancel / new scan
 // ─────────────────────────────────────────────────────────────────────────
+async function _renderIntelligence(result) {
+  const intelligence = result.intelligence;
+  if (!intelligence) {
+    _resetIntelligence();
+    return;
+  }
+
+  const appScore = intelligence.application_score || null;
+  const lifecycle = intelligence.lifecycle_summary || null;
+  document.getElementById('res-app-score').textContent = appScore ? Number(appScore.adjusted_score).toFixed(2) : 'â€”';
+  document.getElementById('res-grade').textContent = intelligence.application_grade || (appScore ? appScore.grade : 'â€”');
+  document.getElementById('res-risk').textContent = intelligence.risk_class || (appScore ? appScore.risk_class : 'â€”');
+  document.getElementById('res-trend').textContent = intelligence.trend_indicator || (appScore ? appScore.trend_indicator : 'â€”');
+  document.getElementById('res-new').textContent = lifecycle ? lifecycle.new_issues : 'â€”';
+  document.getElementById('res-recurring').textContent = lifecycle ? lifecycle.recurring_issues : 'â€”';
+  document.getElementById('res-resolved').textContent = lifecycle ? lifecycle.resolved_issues : 'â€”';
+  document.getElementById('res-regressions').textContent = lifecycle ? lifecycle.regressions : 'â€”';
+
+  document.getElementById('intelligence-section').style.display = 'block';
+  const banner = document.getElementById('intelligence-banner');
+  if (intelligence.status === 'degraded') {
+    banner.style.display = 'block';
+    banner.textContent = intelligence.error_message || 'Intelligence is temporarily unavailable.';
+  } else {
+    banner.style.display = 'none';
+    banner.textContent = '';
+  }
+
+  const priorities = intelligence.top_priorities || [];
+  document.getElementById('priorities-list').innerHTML = priorities.length
+    ? priorities.map(p => `
+      <div class="bottleneck-item">
+        <strong>${_esc(p.entity_key)}</strong>
+        <span style="display:block;color:var(--muted);font-size:0.78rem;">
+          score=${_esc(p.adjusted_score)} risk=${_esc(p.risk_class)} flags=${_esc((p.priority_flags || []).join(', ') || 'none')}
+        </span>
+      </div>`).join('')
+    : '<p class="empty-state">No priority hotspots yet.</p>';
+
+  const pageScores = intelligence.page_scores || [];
+  document.getElementById('page-scores-table').innerHTML = pageScores.length ? `
+    <table style="width:100%;border-collapse:collapse;font-size:0.83rem;">
+      <thead>
+        <tr style="text-align:left;color:#a0aec0;border-bottom:1px solid var(--border);">
+          <th style="padding:8px;">Page</th>
+          <th style="padding:8px;">Score</th>
+          <th style="padding:8px;">Grade</th>
+          <th style="padding:8px;">Risk</th>
+          <th style="padding:8px;">Trend</th>
+          <th style="padding:8px;">Issues</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${pageScores.map(score => `
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+            <td style="padding:8px;">${_esc(score.url)}</td>
+            <td style="padding:8px;">${_esc(score.adjusted_score)}</td>
+            <td style="padding:8px;">${_esc(score.grade)}</td>
+            <td style="padding:8px;">${_esc(score.risk_class)}</td>
+            <td style="padding:8px;">${_esc(score.trend_indicator)}</td>
+            <td style="padding:8px;">${_esc(score.issue_count)}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`
+    : '<p class="empty-state">No page scores available.</p>';
+
+  await _loadHistory(result, intelligence);
+}
+
+async function _loadHistory(result, intelligence) {
+  document.getElementById('history-section').style.display = 'block';
+
+  const appHistory = await _fetchJson(`/api/intelligence/application/history?application_key=${encodeURIComponent(result.application_key || '')}`);
+  _renderHistoryEntries('application-history-list', appHistory && appHistory.entries, entry =>
+    `${entry.scanned_at} • score ${entry.adjusted_score} • grade ${entry.grade} • trend ${entry.trend_indicator}`
+  );
+
+  const pageScores = intelligence.page_scores || [];
+  const pageSelect = document.getElementById('page-history-select');
+  pageSelect.innerHTML = '<option value="">Select a page</option>' + pageScores.map(score =>
+    `<option value="${_esc(score.url)}">${_esc(score.url)}</option>`
+  ).join('');
+  pageSelect.onchange = async function() {
+    if (!pageSelect.value) {
+      document.getElementById('page-history-list').innerHTML = '<p class="empty-state">Select a page to load history.</p>';
+      return;
+    }
+    const pageResp = await _fetchJson(`/api/intelligence/page/history?page_url=${encodeURIComponent(pageSelect.value)}`);
+    _renderHistoryEntries('page-history-list', pageResp && pageResp.entries, entry =>
+      `${entry.scanned_at} • score ${entry.adjusted_score} • grade ${entry.grade} • trend ${entry.trend_indicator}`
+    );
+  };
+  if (pageScores.length) {
+    pageSelect.value = pageScores[0].url;
+    await pageSelect.onchange();
+  } else {
+    document.getElementById('page-history-list').innerHTML = '<p class="empty-state">No page history available.</p>';
+  }
+
+  const auditResp = await _fetchJson('/api/intelligence/audit?limit=20');
+  _renderHistoryEntries('audit-list', auditResp && auditResp.entries, entry =>
+    `${entry.timestamp} • ${entry.action} • ${entry.entity_key}`
+  );
+
+  const eventResp = await _fetchJson('/api/intelligence/events?limit=20');
+  _renderHistoryEntries('event-list', eventResp && eventResp.events, entry =>
+    `${entry.timestamp} • ${entry.event_type} • scan=${entry.scan_id}`
+  );
+}
+
+function _renderHistoryEntries(elementId, entries, formatter) {
+  const el = document.getElementById(elementId);
+  if (!entries || !entries.length) {
+    el.innerHTML = '<p class="empty-state">No data available.</p>';
+    return;
+  }
+  el.innerHTML = entries.map(entry => `<div class="bottleneck-item">${_esc(formatter(entry))}</div>`).join('');
+}
+
+async function _fetchJson(url) {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
+    return await resp.json();
+  } catch (_) {
+    return null;
+  }
+}
+
+function _resetIntelligence() {
+  ['res-app-score','res-grade','res-risk','res-trend','res-new','res-recurring','res-resolved','res-regressions']
+    .forEach(id => { document.getElementById(id).textContent = 'â€”'; });
+  document.getElementById('intelligence-section').style.display = 'none';
+  document.getElementById('history-section').style.display = 'none';
+  document.getElementById('intelligence-banner').style.display = 'none';
+  document.getElementById('intelligence-banner').textContent = '';
+  document.getElementById('priorities-list').innerHTML = '';
+  document.getElementById('page-scores-table').innerHTML = '';
+  document.getElementById('application-history-list').innerHTML = '';
+  document.getElementById('page-history-list').innerHTML = '';
+  document.getElementById('audit-list').innerHTML = '';
+  document.getElementById('event-list').innerHTML = '';
+  document.getElementById('page-history-select').innerHTML = '<option value="">Select a page</option>';
+}
+
 function cancelScan() {
   if (_sse) { _sse.close(); _sse = null; }
   _stopPoll();
@@ -1089,6 +1299,7 @@ function newScan() {
   _stopPoll();
   _scanId = null;
   // Reset results sections
+  _resetIntelligence();
   document.getElementById('defects-section').style.display = 'none';
   document.getElementById('perf-section').style.display = 'none';
   document.getElementById('ai-section').style.display = 'none';
