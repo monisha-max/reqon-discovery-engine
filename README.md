@@ -254,14 +254,6 @@ Without an LLM key, the planner and classifier fall back to rule-based heuristic
 | `/api/intelligence/audit` | GET | Audit log |
 | `/api/intelligence/events` | GET | Scan events |
 
-## Recommended Demo URLs
-
-| URL | Good for |
-|-----|----------|
-| `https://the-internet.herokuapp.com` | Diverse page types, auth page, broken images, console errors |
-| `https://juice-shop.herokuapp.com` | SPA (Angular), real defects, auth flows, many endpoints |
-| `https://books.toscrape.com` | Many pages, fast crawl, good classification demo |
-
 ## Team
 
 Built by:
