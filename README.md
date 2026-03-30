@@ -1,4 +1,6 @@
-![WhatsApp Image 2026-03-30 at 10 43 11 PM](https://github.com/user-attachments/assets/f44e7301-9b76-4f11-80aa-1de336a71be3)# ReQon Discovery Engine
+![WhatsApp Image 2026-03-30 at 10 43 11 PM](https://github.com/user-attachments/assets/f44e7301-9b76-4f11-80aa-1de336a71be3)
+
+# ReQon Discovery Engine
 
 An autonomous, AI-powered web testing platform that crawls any web application, detects defects, runs performance tests, and produces a single Hygiene Score with evidence for every finding.
 
