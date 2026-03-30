@@ -1964,8 +1964,12 @@ function _renderDimensionBreakdown(intelligence) {
     const scoreVals = dimNames.map(n => Math.max(0, Math.min(100, 100 - dims[n].penalty * 2)));
     const hasZero = scoreVals.some(s => s <= 0);
     const hasPerfect = scoreVals.some(s => s >= 100);
+    // Remove any existing note first
+    const oldNote = document.getElementById('dimension-warning-note');
+    if (oldNote) oldNote.remove();
     if (hasZero && hasPerfect) {
       const noteEl = document.createElement('p');
+      noteEl.id = 'dimension-warning-note';
       noteEl.style.cssText = 'font-size:0.78rem;color:var(--warn);margin:-4px 0 14px;';
       noteEl.textContent = 'Note: Some dimensions score 0 while others score 100. The overall Hygiene Score is dragged down by the weakest areas. Fix the red dimensions to see the biggest score improvement.';
       dimSection.parentNode.insertBefore(noteEl, dimSection.nextSibling);
