@@ -16,6 +16,13 @@ class Settings:
     # PostgreSQL
     DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://apple@localhost:5432/reqon")
 
+    # Neo4j / Intelligence
+    NEO4J_URI: str = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+    NEO4J_USERNAME: str = os.getenv("NEO4J_USERNAME", "neo4j")
+    NEO4J_PASSWORD: str = os.getenv("NEO4J_PASSWORD", "reqonpassword")
+    NEO4J_DATABASE: str = os.getenv("NEO4J_DATABASE", "neo4j")
+    REQON_DEFAULT_TENANT: str = os.getenv("REQON_DEFAULT_TENANT", "default")
+
     # Crawl
     MAX_PAGES: int = int(os.getenv("MAX_PAGES", "100"))
     MAX_DEPTH: int = int(os.getenv("MAX_DEPTH", "5"))

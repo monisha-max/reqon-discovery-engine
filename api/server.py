@@ -15,8 +15,13 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
 from pathlib import Path
 from typing import Any, Optional
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+os.environ.setdefault("CRAWL4_AI_BASE_DIRECTORY", str(Path(__file__).resolve().parent.parent))
+os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 
 import structlog
 from fastapi import FastAPI, HTTPException
@@ -31,6 +36,7 @@ from api.scan_manager import (
     get_scan_status,
     run_scan,
 )
+from intelligence.services.runtime import application_history, audit_history, event_history, page_history
 
 # ---------------------------------------------------------------------------
 # Configure structlog — inject ScanAwareProcessor once at startup
@@ -186,7 +192,7 @@ async def start_scan(body: ScanRequest) -> ScanStarted:
 
     defect_config: Optional[dict[str, Any]] = None
     if body.enable_defect:
-        defect_config = {}
+        defect_config = {"enabled": True}
 
     scan_id = create_scan(
         target_url=body.target_url,
@@ -220,6 +226,38 @@ async def scan_result(scan_id: str) -> dict:
         raise HTTPException(status_code=202, detail="Scan still running")
     result = get_scan_result(scan_id)
     return result or {}
+
+
+@app.get("/api/intelligence/application/history")
+async def intelligence_application_history(application_key: str) -> dict:
+    try:
+        return application_history(application_key)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Intelligence history unavailable: {exc}") from exc
+
+
+@app.get("/api/intelligence/page/history")
+async def intelligence_page_history(page_url: str) -> dict:
+    try:
+        return page_history(page_url)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Page history unavailable: {exc}") from exc
+
+
+@app.get("/api/intelligence/audit")
+async def intelligence_audit(limit: int = 100) -> dict:
+    try:
+        return audit_history(limit=limit)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Audit history unavailable: {exc}") from exc
+
+
+@app.get("/api/intelligence/events")
+async def intelligence_events(limit: int = 100) -> dict:
+    try:
+        return event_history(limit=limit)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Event history unavailable: {exc}") from exc
 
 
 @app.get("/api/scan/{scan_id}/stream")
@@ -264,3 +302,16 @@ async def scan_stream(scan_id: str) -> StreamingResponse:
             "X-Accel-Buffering": "no",
         },
     )
+
+if __name__ == "__main__":
+    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+    os.environ.setdefault("CRAWL4_AI_BASE_DIRECTORY", str(Path(__file__).resolve().parent.parent))
+    import uvicorn
+    uvicorn.run(
+        "api.server:app",
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", "8765")),
+        reload=False,
+        log_level="info",
+    )
+

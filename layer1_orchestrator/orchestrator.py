@@ -163,18 +163,23 @@ async def finalize_node(state: dict) -> dict:
     return {"result": result, "phase": "complete"}
 
 
-def should_run_perf_tests(state: GraphState) -> str:
-    """Conditional edge: run performance tests if perf_config is present."""
+def should_run_post_processing(state: GraphState) -> str:
+    """Conditional edge: run perf, defect-only, or end after finalize."""
     if state.get("perf_config"):
         logger.info("orchestrator.routing_to_perf_tests")
         return "perf_test"
+
+    defect_config = state.get("defect_config") or {}
+    if defect_config.get("enabled"):
+        logger.info("orchestrator.routing_to_defect_detection")
+        return "defect_detect"
     return END
 
 
 def should_run_defect_detection(state: GraphState) -> str:
-    """Conditional edge: run defect detection if snapshot_artifacts were captured."""
+    """Conditional edge: run defect detection after perf when enabled."""
     defect_config = state.get("defect_config") or {}
-    if defect_config.get("enabled") and defect_config.get("snapshot_artifacts"):
+    if defect_config.get("enabled"):
         logger.info("orchestrator.routing_to_defect_detection")
         return "defect_detect"
     return END
@@ -218,8 +223,9 @@ def build_graph() -> StateGraph:
     })
 
     # FINALIZE → PERF_TEST (if enabled) or END
-    graph.add_conditional_edges("finalize", should_run_perf_tests, {
+    graph.add_conditional_edges("finalize", should_run_post_processing, {
         "perf_test": "perf_test",
+        "defect_detect": "defect_detect",
         END: END,
     })
 
