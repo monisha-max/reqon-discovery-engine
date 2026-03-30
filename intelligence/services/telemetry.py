@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from intelligence.models.contracts import AuditLogEntry, ScanEventMessage
 from intelligence.repositories.contracts import AuditLogStore, ScanEventBroker
@@ -19,7 +19,7 @@ class TelemetryService:
         payload: dict,
     ) -> None:
         event = ScanEventMessage(
-            timestamp=datetime.now(UTC),
+            timestamp=datetime.now(timezone.utc),
             tenant_id=tenant_id,
             scan_id=scan_id,
             event_type=event_type,
@@ -39,7 +39,7 @@ class TelemetryService:
         self.audit_store.write(
             tenant_id=tenant_id,
             entry=AuditLogEntry(
-                timestamp=datetime.now(UTC),
+                timestamp=datetime.now(timezone.utc),
                 action=action,
                 entity_type=entity_type,
                 entity_key=entity_key,

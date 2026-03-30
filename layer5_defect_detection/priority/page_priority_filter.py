@@ -5,13 +5,13 @@ Reuses existing PageType enum and PageData.performance.cls from Layer 2.
 No re-classification — reads what the crawler already determined.
 
 Tier 1: PageType is AUTH, WIZARD, FORM, or DASHBOARD
-Tier 2: URL matches known high-risk path patterns (fallback for low-confidence classifications)
+Tier 2: URL path matches a known high-risk pattern (trusted over classifier)
 Tier 3: Crawl-time CLS > 0.1 (already showed layout instability before load)
 """
 from __future__ import annotations
 
 import re
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import structlog
 
@@ -51,6 +51,17 @@ TIER2_URL_PATTERNS: list[tuple[str, str]] = [
 # Tier 3: CLS threshold — layout shift already happening at crawl time
 CLS_INSTABILITY_THRESHOLD = 0.1
 
+# Paths probed on the target domain when no priority pages appear in the crawl
+PROBE_PATHS: list[tuple[str, str, str]] = [
+    ("/login",     "auth",      "login"),
+    ("/signin",    "auth",      "signin"),
+    ("/register",  "auth",      "register"),
+    ("/signup",    "auth",      "signup"),
+    ("/checkout",  "checkout",  "checkout"),
+    ("/cart",      "cart",      "cart"),
+    ("/dashboard", "dashboard", "dashboard"),
+]
+
 
 def _get_page_type(page: dict) -> str:
     return (page.get("page_type") or "unknown").lower()
@@ -60,7 +71,6 @@ def _get_cls(page: dict) -> float:
     perf = page.get("performance") or {}
     if isinstance(perf, dict):
         return float(perf.get("cls") or 0.0)
-    # pydantic model serialized as object with attribute
     cls_val = getattr(perf, "cls", None)
     return float(cls_val) if cls_val is not None else 0.0
 
@@ -79,9 +89,21 @@ def _page_slug(page: dict) -> str:
     page_type = _get_page_type(page)
     url = page.get("url", "")
     path = urlparse(url).path.strip("/").replace("/", "_") or "index"
-    # Keep it short and filesystem-safe
     path = re.sub(r"[^a-z0-9_-]", "", path.lower())[:40]
     return f"{page_type}_{path}" if path else page_type
+
+
+def make_snapshot_artifact(phase: str, page: dict, screenshot_path: str) -> dict:
+    """Build a snapshot artifact dict from a priority page and its screenshot path."""
+    return {
+        "phase": phase,
+        "url": page.get("url", ""),
+        "page_type": page.get("page_type", "unknown"),
+        "page_slug": page.get("_page_slug", ""),
+        "priority_tier": page.get("_priority_tier"),
+        "priority_reason": page.get("_priority_reason", ""),
+        "screenshot_path": screenshot_path,
+    }
 
 
 def get_priority_pages(
@@ -106,7 +128,6 @@ def get_priority_pages(
             continue
 
         page_type = _get_page_type(page)
-        confidence = float(page.get("page_type_confidence") or 0.0)
 
         # Tier 1: PageType is directly high-priority
         if page_type in TIER1_PAGE_TYPES:
@@ -118,8 +139,8 @@ def get_priority_pages(
             seen_urls.add(url)
             continue
 
-        # Tier 2: URL pattern match — trust the URL over the classifier.
-        # A page at /login is high-priority regardless of what the classifier said.
+        # Tier 2: URL path matches a known high-risk pattern.
+        # Trusted over the classifier — a page at /login is high-priority regardless.
         url_label = _url_tier2_match(url)
         if url_label:
             enriched = dict(page)
@@ -140,11 +161,8 @@ def get_priority_pages(
             tier3.append(enriched)
             seen_urls.add(url)
 
-    # Sort Tier 1 by page_type priority: auth/wizard first, then form, then dashboard
     _tier1_order = {"auth": 0, "wizard": 1, "form": 2, "dashboard": 3}
     tier1.sort(key=lambda p: _tier1_order.get(_get_page_type(p), 99))
-
-    # Sort Tier 3 by CLS descending (most unstable first)
     tier3.sort(key=lambda p: _get_cls(p), reverse=True)
 
     result = (tier1 + tier2 + tier3)[:max_pages]
@@ -166,29 +184,16 @@ def probe_priority_paths(base_url: str) -> list[dict]:
     """
     Build synthetic page dicts for common high-risk paths on base_url.
 
-    Used as a fallback when crawled pages contain no priority pages
-    (e.g., a news/social site where auth pages weren't visited during crawl).
-    Each returned dict is compatible with get_priority_pages() output.
+    Used when no priority pages appear in the crawl (e.g. a social site where
+    auth pages were never visited). Each dict is compatible with get_priority_pages() output.
     """
-    from urllib.parse import urljoin
-
-    PROBE_PATHS: list[tuple[str, str, str]] = [
-        ("/login",    "auth",      "login"),
-        ("/signin",   "auth",      "signin"),
-        ("/register", "auth",      "register"),
-        ("/signup",   "auth",      "signup"),
-        ("/checkout", "checkout",  "checkout"),
-        ("/cart",     "cart",      "cart"),
-        ("/dashboard","dashboard", "dashboard"),
-    ]
-
     synthetic: list[dict] = []
     for path, label, slug_suffix in PROBE_PATHS:
         url = urljoin(base_url.rstrip("/") + "/", path.lstrip("/"))
         synthetic.append({
             "url": url,
             "page_type": label,
-            "page_type_confidence": 0.0,   # not crawled, confidence unknown
+            "page_type_confidence": 0.0,
             "performance": {},
             "_priority_tier": 2,
             "_priority_reason": f"Tier 2 — probed path {path} (not in crawl)",
@@ -196,3 +201,39 @@ def probe_priority_paths(base_url: str) -> list[dict]:
         })
 
     return synthetic
+
+
+def resolve_priority_pages(
+    pages: list[dict],
+    target_url: str,
+    max_pages: int = 10,
+) -> list[dict]:
+    """
+    Resolve the final priority page list with a three-level fallback:
+      1. Crawled pages that match tier filters
+      2. Probed common paths on the target domain (not in crawl)
+      3. The target root URL itself
+
+    Always returns at least one page.
+    """
+    result = get_priority_pages(pages, max_pages=max_pages)
+    if result:
+        return result
+
+    logger.info("page_priority_filter.probing",
+                reason="No priority pages in crawl; probing common paths")
+    result = probe_priority_paths(target_url)
+    if result:
+        return result
+
+    logger.warning("page_priority_filter.root_fallback",
+                   reason="No probed paths resolved; falling back to target root")
+    return [{
+        "url": target_url,
+        "page_type": "unknown",
+        "page_type_confidence": 0.0,
+        "performance": {},
+        "_priority_tier": 4,
+        "_priority_reason": "Fallback — target root URL",
+        "_page_slug": "unknown_root",
+    }]

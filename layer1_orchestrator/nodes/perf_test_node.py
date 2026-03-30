@@ -103,9 +103,6 @@ async def perf_test_node(state: dict) -> dict:
             target_url=target_url,
             state=state,
             defect_config=defect_config,
-            load_users=load_users,
-            load_spawn_rate=load_spawn_rate,
-            load_duration=load_duration,
         )
     else:
         result_dict = await _run_perf_only(perf_request, pages, target_url)
@@ -166,9 +163,6 @@ async def _run_with_visual_capture(
     target_url: str,
     state: dict,
     defect_config: dict,
-    load_users: float,
-    load_spawn_rate: float,
-    load_duration: float,
 ) -> tuple[dict | None, dict]:
     """
     Coordinate three-phase Playwright capture around the Locust subprocess.
@@ -178,8 +172,8 @@ async def _run_with_visual_capture(
     """
     from layer5_defect_detection.capture.screenshot_capture import ScreenshotCapture
     from layer5_defect_detection.priority.page_priority_filter import (
-        get_priority_pages,
-        probe_priority_paths,
+        make_snapshot_artifact,
+        resolve_priority_pages,
     )
 
     output_dir = os.path.join("output", "defect_reports")
@@ -187,28 +181,7 @@ async def _run_with_visual_capture(
     max_pages = defect_config.get("max_pages", 10)
     storage_state_path = state.get("storage_state_path")
 
-    # Filter to high-priority pages from crawl
-    priority_pages = get_priority_pages(pages, max_pages=max_pages)
-
-    if not priority_pages:
-        # Fallback 1: probe common high-risk paths on the target domain
-        logger.info("perf_test_node.probing_priority_paths",
-                    reason="No priority pages in crawl; probing common paths")
-        priority_pages = probe_priority_paths(target_url)
-
-    if not priority_pages:
-        # Fallback 2: use the target URL itself so we always run the pipeline
-        logger.warning("perf_test_node.using_root_as_priority_page",
-                       reason="No probed paths resolved; falling back to target root")
-        priority_pages = [{
-            "url": target_url,
-            "page_type": "unknown",
-            "page_type_confidence": 0.0,
-            "performance": {},
-            "_priority_tier": 4,
-            "_priority_reason": "Fallback — target root URL",
-            "_page_slug": "unknown_root",
-        }]
+    priority_pages = resolve_priority_pages(pages, target_url, max_pages)
 
     logger.info("perf_test_node.visual_capture_start",
                 priority_pages=len(priority_pages))
@@ -218,39 +191,47 @@ async def _run_with_visual_capture(
 
     await capture.start()
     try:
-        # Phase 1: Baseline — BEFORE Locust starts (sequential)
-        for p in priority_pages:
-            path, _ = await capture.capture_and_release("baseline", url=p["url"])
-            snapshot_artifacts.append(_make_artifact("baseline", p, path))
+        # Phase 1: Baseline — BEFORE Locust starts (parallel across pages)
+        baseline_results = await asyncio.gather(
+            *[capture.capture_and_release("baseline", url=p["url"]) for p in priority_pages],
+            return_exceptions=True,
+        )
+        for p, res in zip(priority_pages, baseline_results):
+            if isinstance(res, Exception):
+                logger.warning("perf_test_node.baseline_capture_failed",
+                               url=p["url"], error=str(res))
+            else:
+                snapshot_artifacts.append(make_snapshot_artifact("baseline", p, res[0]))
         logger.info("perf_test_node.baseline_captured", count=len(priority_pages))
 
-        # Phase 2: Locust + peak capture CONCURRENT
-        # Peak delay: wait until users are fully ramped, then capture
-        ramp_time = load_users / max(load_spawn_rate, 0.1)
-        peak_delay = max(ramp_time * 1.2, load_duration / 2)
+        # Phase 2: Locust + peak capture — concurrent.
+        # Peak fires after users are fully ramped (ramp_time * 1.2 or half duration).
+        ramp_time = perf_request.load_users / max(perf_request.load_spawn_rate, 0.1)
+        peak_delay = max(ramp_time * 1.2, perf_request.load_duration_seconds / 2)
 
         async def capture_peak() -> list[dict]:
             await asyncio.sleep(peak_delay)
-            results = []
-            for p in priority_pages:
-                try:
-                    path, _ = await capture.capture_and_release("peak", url=p["url"])
-                    results.append(_make_artifact("peak", p, path))
-                except Exception as exc:
+            results = await asyncio.gather(
+                *[capture.capture_and_release("peak", url=p["url"]) for p in priority_pages],
+                return_exceptions=True,
+            )
+            artifacts = []
+            for p, res in zip(priority_pages, results):
+                if isinstance(res, Exception):
                     logger.warning("perf_test_node.peak_capture_failed",
-                                   url=p["url"], error=str(exc))
-            return results
+                                   url=p["url"], error=str(res))
+                else:
+                    artifacts.append(make_snapshot_artifact("peak", p, res[0]))
+            return artifacts
 
         locust_task = asyncio.create_task(
             run_performance_tests(request=perf_request, crawled_pages=pages)
         )
         peak_task = asyncio.create_task(capture_peak())
 
-        raw_results = await asyncio.gather(
+        locust_result, peak_artifacts = await asyncio.gather(
             locust_task, peak_task, return_exceptions=True
         )
-
-        locust_result, peak_artifacts = raw_results[0], raw_results[1]
 
         if isinstance(locust_result, Exception):
             logger.error("perf_test_node.locust_failed", error=str(locust_result))
@@ -270,20 +251,22 @@ async def _run_with_visual_capture(
             logger.warning("perf_test_node.peak_capture_task_failed",
                            error=str(peak_artifacts))
 
-        # Phase 3: Post-test — AFTER Locust exits (sequential)
-        for p in priority_pages:
-            try:
-                path, _ = await capture.capture_and_release("post", url=p["url"])
-                snapshot_artifacts.append(_make_artifact("post", p, path))
-            except Exception as exc:
+        # Phase 3: Post-test — AFTER Locust exits (parallel across pages)
+        post_results = await asyncio.gather(
+            *[capture.capture_and_release("post", url=p["url"]) for p in priority_pages],
+            return_exceptions=True,
+        )
+        for p, res in zip(priority_pages, post_results):
+            if isinstance(res, Exception):
                 logger.warning("perf_test_node.post_capture_failed",
-                               url=p["url"], error=str(exc))
+                               url=p["url"], error=str(res))
+            else:
+                snapshot_artifacts.append(make_snapshot_artifact("post", p, res[0]))
         logger.info("perf_test_node.post_captured", count=len(priority_pages))
 
     finally:
         await capture.stop()
 
-    # Write priority pages manifest
     try:
         from layer5_defect_detection.evidence.evidence_builder import EvidenceBuilder
         builder = EvidenceBuilder(output_dir)
@@ -293,15 +276,3 @@ async def _run_with_visual_capture(
 
     defect_config["snapshot_artifacts"] = snapshot_artifacts
     return result_dict, defect_config
-
-
-def _make_artifact(phase: str, page: dict, screenshot_path: str) -> dict:
-    return {
-        "phase": phase,
-        "url": page.get("url", ""),
-        "page_type": page.get("page_type", "unknown"),
-        "page_slug": page.get("_page_slug", ""),
-        "priority_tier": page.get("_priority_tier"),
-        "priority_reason": page.get("_priority_reason", ""),
-        "screenshot_path": screenshot_path,
-    }

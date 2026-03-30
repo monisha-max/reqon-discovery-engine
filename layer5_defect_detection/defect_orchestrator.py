@@ -24,6 +24,7 @@ from typing import Optional
 
 import structlog
 
+from layer5_defect_detection.analyzers.a11y_analyzer import A11yAnalyzer
 from layer5_defect_detection.analyzers.contrast_analyzer import ContrastAnalyzer
 from layer5_defect_detection.analyzers.dom_behavioral_analyzer import DOMBehavioralAnalyzer
 from layer5_defect_detection.analyzers.functional_analyzer import FunctionalAnalyzer
@@ -99,6 +100,7 @@ async def run_defect_detection(
     contrast_analyzer = ContrastAnalyzer()
     functional_analyzer = FunctionalAnalyzer()
     dom_behavioral_analyzer = DOMBehavioralAnalyzer()
+    a11y_analyzer = A11yAnalyzer()
     mapper = FindingsMapper()
     annotator = Annotator()
     builder = EvidenceBuilder(run_dir)
@@ -165,6 +167,9 @@ async def run_defect_detection(
                     )
                     raw_findings.extend(
                         await dom_behavioral_analyzer.analyze(page, phase)
+                    )
+                    raw_findings.extend(
+                        await a11y_analyzer.analyze(page, phase)
                     )
                     # Console errors / network failures / response telemetry
                     # — all captured pre-navigation via event listeners

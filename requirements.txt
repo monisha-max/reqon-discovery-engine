@@ -35,6 +35,8 @@ rich>=13.0.0
 
 # Layer 5 - Defect Detection
 Pillow>=10.0.0
+# axe-core JS engine is bundled at layer5_defect_detection/assets/axe.min.js
+# Bootstrap once: python -c "import urllib.request; urllib.request.urlretrieve('https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.9.1/axe.min.js', 'layer5_defect_detection/assets/axe.min.js')"
 
 # Layer 3 - Performance Testing
 locust>=2.20.0

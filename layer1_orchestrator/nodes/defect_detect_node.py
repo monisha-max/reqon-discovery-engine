@@ -27,60 +27,39 @@ async def _capture_standalone_artifacts(
     defect_config: dict,
 ) -> list[dict]:
     """
-    Capture baseline-only screenshots from crawled pages so defect detection
-    can run without perf_test_node having populated snapshot_artifacts.
+    Capture baseline-only screenshots when perf_test_node didn't populate snapshot_artifacts.
     """
+    import asyncio
+
     from layer5_defect_detection.capture.screenshot_capture import ScreenshotCapture
     from layer5_defect_detection.priority.page_priority_filter import (
-        get_priority_pages,
-        probe_priority_paths,
+        make_snapshot_artifact,
+        resolve_priority_pages,
     )
 
     output_dir = os.path.join("output", "defect_reports", "standalone")
     viewport = defect_config.get("viewport", {"width": 1920, "height": 1080})
     max_pages = defect_config.get("max_pages", 10)
 
-    priority_pages = get_priority_pages(pages, max_pages=max_pages)
-    if not priority_pages:
-        priority_pages = probe_priority_paths(target_url)
-    if not priority_pages:
-        priority_pages = [{
-            "url": target_url,
-            "page_type": "unknown",
-            "page_type_confidence": 0.0,
-            "performance": {},
-            "_priority_tier": 4,
-            "_priority_reason": "Standalone fallback — target root URL",
-            "_page_slug": "root",
-        }]
+    priority_pages = resolve_priority_pages(pages, target_url, max_pages)
 
-    logger.info(
-        "defect_detect_node.standalone_capture",
-        priority_pages=len(priority_pages),
-    )
+    logger.info("defect_detect_node.standalone_capture", priority_pages=len(priority_pages))
 
     capture = ScreenshotCapture(target_url, storage_state_path, output_dir, viewport)
     artifacts: list[dict] = []
 
     await capture.start()
     try:
-        for p in priority_pages:
-            try:
-                path, _ = await capture.capture_and_release("baseline", url=p["url"])
-                artifacts.append({
-                    "phase": "baseline",
-                    "url": p.get("url", target_url),
-                    "page_type": p.get("page_type", "unknown"),
-                    "page_slug": p.get("_page_slug", "unknown"),
-                    "priority_tier": p.get("_priority_tier"),
-                    "priority_reason": p.get("_priority_reason", "standalone"),
-                    "screenshot_path": path,
-                })
-            except Exception as exc:
-                logger.warning(
-                    "defect_detect_node.standalone_capture_failed",
-                    url=p.get("url"), error=str(exc),
-                )
+        results = await asyncio.gather(
+            *[capture.capture_and_release("baseline", url=p["url"]) for p in priority_pages],
+            return_exceptions=True,
+        )
+        for p, res in zip(priority_pages, results):
+            if isinstance(res, Exception):
+                logger.warning("defect_detect_node.standalone_capture_failed",
+                               url=p.get("url"), error=str(res))
+            else:
+                artifacts.append(make_snapshot_artifact("baseline", p, res[0]))
     finally:
         await capture.stop()
 

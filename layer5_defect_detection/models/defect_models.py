@@ -39,6 +39,8 @@ class DefectCategory(str, Enum):
     REQUEST_RETRY = "request_retry"         # Same URL fetched 3+ times (flakiness)
     AUTH_FAILURE = "auth_failure"           # Mid-session 401/403 on XHR/API calls
     SECURITY_HYGIENE = "security_hygiene"   # CSP violations, mixed content, CORS blocks
+    # Accessibility
+    ACCESSIBILITY = "accessibility"         # axe-core WCAG violations not covered by specific categories above
 
 
 class BoundingBox(BaseModel):
