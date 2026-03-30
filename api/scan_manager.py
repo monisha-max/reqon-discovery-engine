@@ -263,6 +263,9 @@ async def run_scan(scan_id: str) -> None:
                 "status": "degraded",
                 "error_message": _friendly,
                 "application_score": None,
+                "application_grade": None,
+                "risk_class": None,
+                "trend_indicator": None,
                 "page_scores": [],
                 "lifecycle_summary": None,
                 "page_summaries": [],
@@ -363,9 +366,22 @@ def _safe_result(final_state: dict) -> dict:
                     enriched_finding = dict(finding)
                     enriched_finding.setdefault("url", page_summary.get("url", ""))
                     findings.append(enriched_finding)
+        # Count per severity
+        sev_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+        for f in findings:
+            sev = (f.get("severity") or "info").lower()
+            if sev in sev_counts:
+                sev_counts[sev] += 1
+            else:
+                sev_counts["info"] += 1
+
         defect_summary = {
             "total_findings": defect_result.get("total_defects", len(findings)),
-            "critical": defect_result.get("critical_count", 0) + defect_result.get("high_count", 0),
+            "critical_count": sev_counts["critical"],
+            "high_count": sev_counts["high"],
+            "medium_count": sev_counts["medium"],
+            "low_count": sev_counts["low"],
+            "info_count": sev_counts["info"],
             "report_path": defect_result.get("report_path", ""),
             "top_findings": [
                 {

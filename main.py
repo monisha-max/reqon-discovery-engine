@@ -411,6 +411,74 @@ async def main():
     if state.get("defect_result"):
         print_defect_results(state["defect_result"])
 
+    # Intelligence scoring (wire through same path as API)
+    await _run_intelligence(state, args.url)
+
+
+async def _run_intelligence(state, target_url):
+    """Run intelligence scoring and display results in CLI."""
+    try:
+        from intelligence.services.runtime import process_final_state
+        import uuid
+
+        scan_id = str(uuid.uuid4())[:8]
+        intel = process_final_state(state, target_url, scan_id)
+
+        if not intel:
+            return
+
+        app_score = intel.get("application_score", {})
+        lifecycle = intel.get("lifecycle_summary", {})
+        page_scores = intel.get("page_scores", [])
+
+        # Main score panel
+        grade = app_score.get("grade", "?")
+        score = app_score.get("adjusted_score", 0)
+        risk = app_score.get("risk_class", "?")
+        trend = app_score.get("trend_indicator", "?")
+
+        grade_color = {"A": "green", "B": "green", "C": "yellow", "D": "red", "F": "red"}.get(grade, "white")
+
+        console.print(Panel(
+            f"[bold {grade_color}]Grade: {grade}[/bold {grade_color}]  |  "
+            f"Score: [bold]{score:.1f}[/bold]/100  |  "
+            f"Risk: {risk}  |  "
+            f"Trend: {trend}\n\n"
+            f"New: {lifecycle.get('new_issues', 0)}  |  "
+            f"Recurring: {lifecycle.get('recurring_issues', 0)}  |  "
+            f"Resolved: {lifecycle.get('resolved_issues', 0)}  |  "
+            f"Regressions: {lifecycle.get('regressions', 0)}",
+            title="Intelligence — Hygiene Score",
+            border_style=grade_color,
+        ))
+
+        # Page scores table
+        if page_scores:
+            from rich.table import Table as RichTable
+            t = RichTable(title="Page Scores")
+            t.add_column("Page", style="cyan", max_width=55)
+            t.add_column("Score", justify="right", style="bold")
+            t.add_column("Grade", justify="center")
+            t.add_column("Risk", justify="center")
+            t.add_column("Issues", justify="right")
+
+            for ps in page_scores:
+                pg = ps.get("grade", "?")
+                gc = {"A": "green", "B": "green", "C": "yellow", "D": "red", "F": "red"}.get(pg, "white")
+                t.add_row(
+                    ps.get("url", "")[:55],
+                    f"{ps.get('adjusted_score', 0):.1f}",
+                    f"[{gc}]{pg}[/{gc}]",
+                    ps.get("risk_class", "?"),
+                    str(ps.get("issue_count", 0)),
+                )
+            console.print(t)
+
+    except ImportError:
+        console.print("[dim]Intelligence layer not available (Neo4j not configured)[/dim]")
+    except Exception as e:
+        console.print(f"[dim]Intelligence scoring skipped: {e}[/dim]")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

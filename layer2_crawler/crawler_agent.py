@@ -70,6 +70,16 @@ class CrawlerAgent:
             # Seed the frontier
             self.frontier.add_url(self.request.target_url, depth=0)
 
+            # Probe common SPA routes to improve discovery on JS-heavy apps
+            base = self.request.target_url.rstrip("/")
+            common_paths = [
+                "/login", "/signin", "/register", "/signup", "/dashboard",
+                "/settings", "/profile", "/search", "/cart", "/checkout",
+                "/admin", "/about", "/contact", "/help", "/faq",
+            ]
+            for path in common_paths:
+                self.frontier.add_url(base + path, source_url=base, depth=1)
+
             iteration = 0
             while True:
                 iteration += 1

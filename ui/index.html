@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -718,6 +719,226 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   font-size: 0.88rem;
   display: none;
 }
+
+/* ── Hero Score Card ─────────────────────────────── */
+.hero-score {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  padding: 32px 40px;
+  margin-bottom: 22px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
+  border: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.hero-score .grade-ring {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  border: 4px solid var(--accent);
+  flex-shrink: 0;
+}
+.hero-score .grade-letter {
+  font-size: 3.2rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.hero-score .grade-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.hero-score .score-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hero-score .score-main {
+  font-size: 2.4rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.hero-score .score-max {
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+.hero-score .score-subtitle {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.hero-score .score-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 28px;
+  border-left: 1px solid var(--border);
+}
+.hero-score .meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+.meta-row .meta-label {
+  color: var(--muted);
+  font-weight: 500;
+  min-width: 50px;
+}
+.meta-row .meta-value {
+  font-weight: 700;
+}
+@media (max-width: 600px) {
+  .hero-score { flex-direction: column; text-align: center; padding: 24px 20px; }
+  .hero-score .score-meta { padding-left: 0; border-left: none; border-top: 1px solid var(--border); padding-top: 12px; }
+}
+
+/* ── Compact Stats Row ───────────────────────────── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+@media (max-width: 600px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+.stat-mini {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  text-align: center;
+}
+.stat-mini .stat-num {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.stat-mini .stat-lbl {
+  font-size: 0.62rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* ── Charts Grid ─────────────────────────────────── */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+@media (max-width: 700px) {
+  .charts-grid { grid-template-columns: 1fr; }
+}
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+.chart-card h4 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.chart-card canvas {
+  max-height: 260px;
+}
+
+/* ── Scan Comparison Banner ──────────────────────── */
+.comparison-banner {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 16px 22px;
+  border-radius: var(--radius);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  margin-bottom: 18px;
+  align-items: center;
+}
+.comparison-banner .comp-label {
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.comparison-banner .comp-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.comp-stat.new-issues { color: var(--warn); }
+.comp-stat.regressions { color: var(--error); }
+.comp-stat.resolved { color: var(--success); }
+.comp-stat.recurring { color: var(--muted); }
+
+/* ── Dimension Breakdown ─────────────────────────── */
+.dimension-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+@media (max-width: 700px) {
+  .dimension-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.dim-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  text-align: center;
+}
+.dim-card .dim-name {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+.dim-card .dim-score {
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+.dim-card .dim-issues {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* ── Priority Flag Badges ────────────────────────── */
+.flag-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin: 2px 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.flag-badge.risk_hotspot { background: rgba(246,107,107,0.2); color: var(--error); }
+.flag-badge.score_below_threshold { background: rgba(246,173,85,0.2); color: var(--warn); }
+.flag-badge.high_issue_volume { background: rgba(243,117,46,0.2); color: var(--accent); }
+.flag-badge.default-flag { background: rgba(138,128,120,0.15); color: var(--muted); }
 </style>
 </head>
 <body>
@@ -779,7 +1000,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
         <div class="feature-icon">⚡</div>
         <h3>Performance Analysis</h3>
         <p>Runs load, stress, and soak tests. Identifies bottlenecks, slow endpoints, and degradation patterns under real traffic conditions.</p>
-        <span class="feature-tag">k6 Powered</span>
+        <span class="feature-tag">Locust Powered</span>
       </div>
       <div class="feature-card">
         <div class="feature-icon">🛡</div>
@@ -986,59 +1207,110 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
     <div id="error-banner" class="error-banner" style="display:none;"></div>
     <div id="auth-banner" style="display:none;margin-bottom:16px;padding:12px 18px;border-radius:var(--radius);font-size:0.88rem;"></div>
 
-    <div class="results-cards">
-      <div class="result-card">
-        <div class="big-num" id="res-pages">—</div>
-        <div class="card-lbl">Pages Crawled</div>
+    <!-- HERO SCORE — the first thing the judge sees -->
+    <div class="hero-score" id="hero-score-card">
+      <div class="grade-ring" id="grade-ring">
+        <span class="grade-letter" id="hero-grade">—</span>
+        <span class="grade-label">Grade</span>
       </div>
-      <div class="result-card">
-        <div class="big-num" id="res-defects">—</div>
-        <div class="card-lbl">Defects Found</div>
+      <div class="score-details">
+        <div>
+          <span class="score-main" id="hero-score">—</span>
+          <span class="score-max"> / 100</span>
+        </div>
+        <div class="score-subtitle">Hygiene Score — overall application health across accessibility, performance, visual, functional, and security dimensions</div>
       </div>
-      <div class="result-card">
-        <div class="big-num" id="res-bottlenecks">—</div>
-        <div class="card-lbl">Bottlenecks</div>
+      <div class="score-meta">
+        <div class="meta-row">
+          <span class="meta-label">Risk</span>
+          <span class="meta-value" id="hero-risk">—</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Trend</span>
+          <span class="meta-value" id="hero-trend">—</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Issues</span>
+          <span class="meta-value" id="hero-issues">—</span>
+        </div>
       </div>
-      <div class="result-card">
-        <div class="big-num" id="res-coverage">—</div>
-        <div class="card-lbl">Coverage Score</div>
+    </div>
+
+    <!-- Discovery + Lifecycle stats (compact) -->
+    <div class="stats-row">
+      <div class="stat-mini" title="Total unique pages discovered and analyzed">
+        <div class="stat-num" id="res-pages">—</div>
+        <div class="stat-lbl">Pages</div>
       </div>
-      <div class="result-card">
-        <div class="big-num" id="res-app-score">—</div>
-        <div class="card-lbl">Application Score</div>
+      <div class="stat-mini" title="Visual, functional, and accessibility defects found">
+        <div class="stat-num" id="res-defects">—</div>
+        <div class="stat-lbl">Defects</div>
       </div>
-      <div class="result-card">
-        <div class="big-num" id="res-grade">—</div>
-        <div class="card-lbl">Grade</div>
+      <div class="stat-mini" title="API endpoints that fail under load">
+        <div class="stat-num" id="res-bottlenecks">—</div>
+        <div class="stat-lbl">Bottlenecks</div>
       </div>
-      <div class="result-card">
-        <div class="big-num" id="res-risk">—</div>
-        <div class="card-lbl">Risk Class</div>
+      <div class="stat-mini" title="Percentage of page types discovered (12 possible)">
+        <div class="stat-num" id="res-coverage">—</div>
+        <div class="stat-lbl">Coverage</div>
       </div>
-      <div class="result-card">
-        <div class="big-num" id="res-trend">—</div>
-        <div class="card-lbl">Trend</div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-mini" title="Issues appearing for the first time">
+        <div class="stat-num" id="res-new">—</div>
+        <div class="stat-lbl">New</div>
       </div>
-      <div class="result-card">
-        <div class="big-num" id="res-new">—</div>
-        <div class="card-lbl">New Issues</div>
+      <div class="stat-mini" title="Issues still present from previous scans">
+        <div class="stat-num" id="res-recurring">—</div>
+        <div class="stat-lbl">Recurring</div>
       </div>
-      <div class="result-card">
-        <div class="big-num" id="res-recurring">—</div>
-        <div class="card-lbl">Recurring</div>
+      <div class="stat-mini" title="Issues fixed since last scan">
+        <div class="stat-num" id="res-resolved">—</div>
+        <div class="stat-lbl">Resolved</div>
       </div>
-      <div class="result-card">
-        <div class="big-num" id="res-resolved">—</div>
-        <div class="card-lbl">Resolved</div>
+      <div class="stat-mini" title="Fixed issues that came back — the most concerning">
+        <div class="stat-num" id="res-regressions">—</div>
+        <div class="stat-lbl">Regressions</div>
       </div>
-      <div class="result-card">
-        <div class="big-num" id="res-regressions">—</div>
-        <div class="card-lbl">Regressions</div>
+    </div>
+
+    <!-- Hidden elements for backward compat with JS that sets these -->
+    <span id="res-app-score" style="display:none;"></span>
+    <span id="res-grade" style="display:none;"></span>
+    <span id="res-risk" style="display:none;"></span>
+    <span id="res-trend" style="display:none;"></span>
+
+    <!-- Scan Comparison Banner -->
+    <div id="comparison-banner" class="comparison-banner" style="display:none;">
+      <span class="comp-label" title="The knowledge graph compares this scan's issues against the previous scan to show what changed">vs Last Scan</span>
+      <span class="comp-stat new-issues" id="comp-new"></span>
+      <span class="comp-stat regressions" id="comp-regressions"></span>
+      <span class="comp-stat resolved" id="comp-resolved"></span>
+      <span class="comp-stat recurring" id="comp-recurring"></span>
+    </div>
+
+    <!-- Dimension Breakdown -->
+    <p id="dimension-label" style="display:none;font-size:0.82rem;color:var(--muted);margin-bottom:8px;">Quality scored across 6 independent dimensions. Strength in one area cannot mask weakness in another — each is evaluated separately.</p>
+    <div id="dimension-section" class="dimension-grid" style="display:none;"></div>
+
+    <!-- Charts: Trend Line + Severity Donut -->
+    <div id="charts-section" class="charts-grid" style="display:none;">
+      <div class="chart-card">
+        <h4>Application Score Trend</h4>
+        <p style="font-size:0.78rem;color:var(--muted);margin:-8px 0 12px;">How your application's hygiene score changes across scans. Rising line = quality improving. Each point is one scan.</p>
+        <canvas id="trend-chart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h4>Defect Severity Distribution</h4>
+        <p style="font-size:0.78rem;color:var(--muted);margin:-8px 0 12px;">Breakdown of all defects found by impact level. Critical and High issues should be fixed before release.</p>
+        <canvas id="severity-chart"></canvas>
       </div>
     </div>
 
     <div class="section-block" id="intelligence-section" style="display:none;">
       <h3>Intelligence Summary</h3>
+      <p style="font-size:0.82rem;color:var(--muted);margin:-4px 0 14px;">Pages ranked by risk. The knowledge graph tracks every issue across scans — recurring and regressed issues are weighted more heavily because they indicate systemic problems.</p>
       <div id="intelligence-banner" class="empty-state" style="display:none;margin-bottom:14px;"></div>
       <div id="priorities-list"></div>
       <div id="page-scores-table" style="margin-top:16px;"></div>
@@ -1046,6 +1318,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
     <div class="section-block" id="history-section" style="display:none;">
       <h3>History</h3>
+      <p style="font-size:0.82rem;color:var(--muted);margin:-4px 0 14px;">Score history stored in the knowledge graph. Each scan builds on the last — the system remembers what it found and tracks whether quality is improving or declining.</p>
       <div style="margin-bottom:16px;">
         <strong style="font-size:0.85rem;color:var(--muted);">Application History</strong>
         <div id="application-history-list" style="margin-top:10px;"></div>
@@ -1071,17 +1344,20 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
     <div class="section-block" id="defects-section" style="display:none;">
       <h3>Top Defects</h3>
+      <p style="font-size:0.82rem;color:var(--muted);margin:-4px 0 14px;">Visual, accessibility, and functional defects detected by analyzing the live DOM, layout geometry, and network telemetry. Each finding includes the exact element and evidence for quick reproduction.</p>
       <div id="defects-list"></div>
     </div>
 
     <div class="section-block" id="perf-section" style="display:none;">
       <h3>Performance Bottlenecks</h3>
+      <p style="font-size:0.82rem;color:var(--muted);margin:-4px 0 14px;">Endpoints that degrade under load. Identified by running load, stress, and soak tests with real concurrent users. Bottlenecks are flagged when p99 latency exceeds 2s, error rate exceeds 5%, or response time degrades more than 2.5x under stress.</p>
       <div id="bottlenecks-list"></div>
       <div id="recommendations-list" style="margin-top:14px;"></div>
     </div>
 
     <div class="section-block" id="ai-section" style="display:none;">
       <h3>AI Analysis</h3>
+      <p style="font-size:0.82rem;color:var(--muted);margin:-4px 0 14px;">AI-generated root cause analysis and recommendations based on the combined crawl, performance, and defect data.</p>
       <p id="ai-text" style="font-size:0.88rem;color:#aaa;line-height:1.75;"></p>
     </div>
 
@@ -1420,7 +1696,7 @@ async function _renderResult(result, statusData) {
 
   document.getElementById('res-pages').textContent = result.pages_crawled ?? '—';
   document.getElementById('res-coverage').textContent =
-    result.coverage_score ? (result.coverage_score * 100).toFixed(0) + '%' : '—';
+    result.coverage_score != null ? (result.coverage_score * 100).toFixed(0) + '%' : '—';
 
   const defect = result.defect_result;
   if (defect) {
@@ -1441,12 +1717,6 @@ async function _renderResult(result, statusData) {
     } else {
       secEl.style.display = 'block';
       listEl.innerHTML = '<p class="empty-state">No defects detected.</p>';
-    }
-    if (defect.report_path) {
-      const rSec = document.getElementById('reports-section');
-      rSec.style.display = 'block';
-      document.getElementById('report-links').innerHTML +=
-        `<a class="report-link" href="/${_outputRelPath(defect.report_path)}" target="_blank">📋 Defect Report</a>`;
     }
   } else {
     document.getElementById('res-defects').textContent = '—';
@@ -1478,15 +1748,20 @@ async function _renderResult(result, statusData) {
       aiSec.style.display = 'block';
       document.getElementById('ai-text').textContent = perf.ai_analysis;
     }
-
-    if (perf.report_path) {
-      const rSec = document.getElementById('reports-section');
-      rSec.style.display = 'block';
-      document.getElementById('report-links').innerHTML +=
-        `<a class="report-link" href="/${_outputRelPath(perf.report_path)}" target="_blank">📊 Performance Report</a>`;
-    }
   } else {
     document.getElementById('res-bottlenecks').textContent = '—';
+  }
+
+  // Collect unique report links (deduplicate)
+  const reportLinks = new Map();
+  if (defect && defect.report_path) reportLinks.set(defect.report_path, '📋 Defect Report');
+  if (perf && perf.report_path) reportLinks.set(perf.report_path, '📊 Performance Report');
+  if (reportLinks.size) {
+    const rSec = document.getElementById('reports-section');
+    rSec.style.display = 'block';
+    document.getElementById('report-links').innerHTML = [...reportLinks.entries()].map(([path, label]) =>
+      `<a class="report-link" href="/${_outputRelPath(path)}" target="_blank">${label}</a>`
+    ).join('');
   }
 
   await _renderIntelligence(result);
@@ -1497,6 +1772,10 @@ async function _renderResult(result, statusData) {
 // ─────────────────────────────────────────────────────────────────────────
 // Cancel / new scan
 // ─────────────────────────────────────────────────────────────────────────
+// Chart instances for cleanup
+let _trendChart = null;
+let _severityChart = null;
+
 async function _renderIntelligence(result) {
   const intelligence = result.intelligence;
   if (!intelligence) {
@@ -1519,7 +1798,8 @@ async function _renderIntelligence(result) {
       el.style.fontSize = '1.4rem';
     }
   }
-  _setCard('res-app-score', appScore ? Number(appScore.adjusted_score).toFixed(2) : null);
+  // Keep hidden compat elements updated
+  _setCard('res-app-score', appScore ? Number(appScore.adjusted_score).toFixed(1) : null);
   _setCard('res-grade', intelligence.application_grade || (appScore ? appScore.grade : null));
   _setCard('res-risk', intelligence.risk_class || (appScore ? appScore.risk_class : null));
   _setCard('res-trend', intelligence.trend_indicator || (appScore ? appScore.trend_indicator : null));
@@ -1527,6 +1807,57 @@ async function _renderIntelligence(result) {
   _setCard('res-recurring', lifecycle ? lifecycle.recurring_issues : null);
   _setCard('res-resolved', lifecycle ? lifecycle.resolved_issues : null);
   _setCard('res-regressions', lifecycle ? lifecycle.regressions : null);
+
+  // ── Hero Score Card ──
+  const grade = intelligence.application_grade || (appScore ? appScore.grade : null);
+  const score = appScore ? Number(appScore.adjusted_score).toFixed(1) : null;
+  const risk = intelligence.risk_class || (appScore ? appScore.risk_class : null);
+  const trend = intelligence.trend_indicator || (appScore ? appScore.trend_indicator : null);
+
+  if (score !== null) {
+    document.getElementById('hero-score').textContent = score;
+    document.getElementById('hero-grade').textContent = grade || '—';
+    document.getElementById('hero-risk').textContent = risk || '—';
+    document.getElementById('hero-trend').textContent = trend || '—';
+
+    // Total issues
+    const totalIssues = (lifecycle ? (lifecycle.new_issues || 0) + (lifecycle.recurring_issues || 0) : 0);
+    document.getElementById('hero-issues').textContent = totalIssues;
+
+    // Color the grade ring based on grade
+    const gradeColors = { A: '#52c97a', B: '#68d391', C: '#f6ad55', D: '#f3752e', F: '#f66b6b' };
+    const gradeColor = gradeColors[grade] || 'var(--accent)';
+    document.getElementById('grade-ring').style.borderColor = gradeColor;
+    document.getElementById('hero-grade').style.color = gradeColor;
+    document.getElementById('hero-score').style.color = gradeColor;
+
+    // Trend arrow
+    const trendEl = document.getElementById('hero-trend');
+    if (trend === 'improving') { trendEl.style.color = 'var(--success)'; trendEl.textContent = 'Improving'; }
+    else if (trend === 'declining') { trendEl.style.color = 'var(--error)'; trendEl.textContent = 'Declining'; }
+    else if (trend === 'stable') { trendEl.style.color = 'var(--muted)'; trendEl.textContent = 'Stable'; }
+    else if (trend === 'new') { trendEl.style.color = 'var(--accent)'; trendEl.textContent = 'First Scan'; }
+  }
+
+  // ── Scan Comparison Banner ──
+  if (lifecycle) {
+    const compBanner = document.getElementById('comparison-banner');
+    const hasChanges = lifecycle.new_issues || lifecycle.regressions || lifecycle.resolved_issues || lifecycle.recurring_issues;
+    if (hasChanges) {
+      compBanner.style.display = 'flex';
+      document.getElementById('comp-new').innerHTML = lifecycle.new_issues
+        ? `<span style="font-size:1.1rem;">+${lifecycle.new_issues}</span> new` : '';
+      document.getElementById('comp-regressions').innerHTML = lifecycle.regressions
+        ? `<span style="font-size:1.1rem;">${lifecycle.regressions}</span> regressions` : '';
+      document.getElementById('comp-resolved').innerHTML = lifecycle.resolved_issues
+        ? `<span style="font-size:1.1rem;">-${lifecycle.resolved_issues}</span> resolved` : '';
+      document.getElementById('comp-recurring').innerHTML = lifecycle.recurring_issues
+        ? `<span style="font-size:1.1rem;">${lifecycle.recurring_issues}</span> recurring` : '';
+    }
+  }
+
+  // ── Dimension Breakdown ──
+  _renderDimensionBreakdown(intelligence);
 
   document.getElementById('intelligence-section').style.display = 'block';
   const banner = document.getElementById('intelligence-banner');
@@ -1538,17 +1869,26 @@ async function _renderIntelligence(result) {
     banner.textContent = '';
   }
 
+  // ── Priority Flags as Badges ──
   const priorities = intelligence.top_priorities || [];
   document.getElementById('priorities-list').innerHTML = priorities.length
-    ? priorities.map(p => `
-      <div class="bottleneck-item">
-        <strong>${_esc(p.entity_key)}</strong>
-        <span style="display:block;color:var(--muted);font-size:0.78rem;">
-          score=${_esc(p.adjusted_score)} risk=${_esc(p.risk_class)} flags=${_esc((p.priority_flags || []).join(', ') || 'none')}
-        </span>
-      </div>`).join('')
+    ? priorities.map(p => {
+        const flags = (p.priority_flags || []).map(f => {
+          const cls = ['risk_hotspot','score_below_threshold','high_issue_volume'].includes(f) ? f : 'default-flag';
+          return `<span class="flag-badge ${cls}">${_esc(f.replace(/_/g, ' '))}</span>`;
+        }).join('');
+        return `<div class="bottleneck-item">
+          <strong>${_esc(p.entity_key)}</strong>
+          <span style="display:block;margin-top:4px;">
+            <span style="color:var(--accent);font-weight:700;font-size:0.85rem;">${Number(p.adjusted_score).toFixed(1)}</span>
+            <span style="color:var(--muted);font-size:0.78rem;margin-left:8px;">${_esc(p.risk_class)}</span>
+            ${flags}
+          </span>
+        </div>`;
+      }).join('')
     : '<p class="empty-state">No priority hotspots yet.</p>';
 
+  // ── Page Scores Table ──
   const pageScores = intelligence.page_scores || [];
   document.getElementById('page-scores-table').innerHTML = pageScores.length ? `
     <table style="width:100%;border-collapse:collapse;font-size:0.83rem;">
@@ -1563,20 +1903,193 @@ async function _renderIntelligence(result) {
         </tr>
       </thead>
       <tbody>
-        ${pageScores.map(score => `
-          <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
-            <td style="padding:8px;">${_esc(score.url)}</td>
-            <td style="padding:8px;">${_esc(score.adjusted_score)}</td>
-            <td style="padding:8px;">${_esc(score.grade)}</td>
+        ${pageScores.map(score => {
+          const gradeColor = {A:'var(--success)',B:'#68d391',C:'var(--warn)',D:'var(--accent)',F:'var(--error)'}[score.grade] || 'var(--text)';
+          return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+            <td style="padding:8px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(score.url)}</td>
+            <td style="padding:8px;font-weight:700;">${Number(score.adjusted_score).toFixed(1)}</td>
+            <td style="padding:8px;font-weight:700;color:${gradeColor};">${_esc(score.grade)}</td>
             <td style="padding:8px;">${_esc(score.risk_class)}</td>
             <td style="padding:8px;">${_esc(score.trend_indicator)}</td>
             <td style="padding:8px;">${_esc(score.issue_count)}</td>
-          </tr>`).join('')}
+          </tr>`;
+        }).join('')}
       </tbody>
     </table>`
     : '<p class="empty-state">No page scores available.</p>';
 
+  // ── Charts ──
+  await _renderCharts(result, intelligence);
+
   await _loadHistory(result, intelligence);
+}
+
+function _renderDimensionBreakdown(intelligence) {
+  const pageScores = intelligence.page_scores || [];
+  // Aggregate dimension penalties across all pages
+  const dims = {};
+  const dimNames = ['accessibility','performance','seo','visual','functional','security'];
+  dimNames.forEach(d => dims[d] = { penalty: 0, issues: 0 });
+
+  pageScores.forEach(ps => {
+    (ps.dimension_breakdown || []).forEach(db => {
+      const key = (db.dimension || '').toLowerCase();
+      if (dims[key] !== undefined) {
+        dims[key].penalty += db.penalty || 0;
+        dims[key].issues += db.issue_count || 0;
+      }
+    });
+  });
+
+  const dimSection = document.getElementById('dimension-section');
+  // Convert penalty to a score (100 - penalty*2, clamped)
+  const cards = dimNames.map(name => {
+    const d = dims[name];
+    const score = Math.max(0, Math.min(100, 100 - d.penalty * 2));
+    const color = score >= 90 ? 'var(--success)' : score >= 70 ? 'var(--warn)' : 'var(--error)';
+    const label = name.charAt(0).toUpperCase() + name.slice(1);
+    return `<div class="dim-card">
+      <div class="dim-name">${label}</div>
+      <div class="dim-score" style="color:${color}">${score.toFixed(0)}</div>
+      <div class="dim-issues">${d.issues} issue${d.issues !== 1 ? 's' : ''}</div>
+    </div>`;
+  });
+
+  if (cards.length) {
+    dimSection.innerHTML = cards.join('');
+    dimSection.style.display = 'grid';
+    document.getElementById('dimension-label').style.display = 'block';
+
+    // Add summary note if scores are polarized
+    const scoreVals = dimNames.map(n => Math.max(0, Math.min(100, 100 - dims[n].penalty * 2)));
+    const hasZero = scoreVals.some(s => s <= 0);
+    const hasPerfect = scoreVals.some(s => s >= 100);
+    if (hasZero && hasPerfect) {
+      const noteEl = document.createElement('p');
+      noteEl.style.cssText = 'font-size:0.78rem;color:var(--warn);margin:-4px 0 14px;';
+      noteEl.textContent = 'Note: Some dimensions score 0 while others score 100 — the overall Hygiene Score is dragged down by the weakest areas. Fix the red dimensions to see the biggest score improvement.';
+      dimSection.parentNode.insertBefore(noteEl, dimSection.nextSibling);
+    }
+  }
+}
+
+async function _renderCharts(result, intelligence) {
+  const chartsSection = document.getElementById('charts-section');
+
+  // Destroy previous charts
+  if (_trendChart) { _trendChart.destroy(); _trendChart = null; }
+  if (_severityChart) { _severityChart.destroy(); _severityChart = null; }
+
+  // ── Trend Line Chart ──
+  try {
+    const appKey = result.application_key || '';
+    const histResp = await _fetchJson(`/api/intelligence/application/history?application_key=${encodeURIComponent(appKey)}`);
+    const entries = (histResp && histResp.entries) || [];
+
+    if (entries.length >= 1) {
+      chartsSection.style.display = 'grid';
+      const labels = entries.map(e => {
+        const d = new Date(e.scanned_at);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      });
+      const scores = entries.map(e => Number(e.adjusted_score) || 0);
+      const grades = entries.map(e => e.grade || '');
+
+      const ctx = document.getElementById('trend-chart').getContext('2d');
+      _trendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Hygiene Score',
+            data: scores,
+            borderColor: '#f3752e',
+            backgroundColor: 'rgba(243,117,46,0.1)',
+            borderWidth: 2.5,
+            pointBackgroundColor: scores.map(s => s >= 80 ? '#52c97a' : s >= 60 ? '#f6ad55' : '#f66b6b'),
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            fill: true,
+            tension: 0.3,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `Score: ${ctx.parsed.y.toFixed(1)} (${grades[ctx.dataIndex]})`,
+              },
+              backgroundColor: '#1f1f1f',
+              titleColor: '#f0ece8',
+              bodyColor: '#f0ece8',
+              borderColor: '#2e2e2e',
+              borderWidth: 1,
+            },
+          },
+          scales: {
+            y: {
+              min: 0, max: 100,
+              grid: { color: 'rgba(255,255,255,0.05)' },
+              ticks: { color: '#8a8078', font: { size: 11 } },
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#8a8078', font: { size: 10 }, maxRotation: 45 },
+            },
+          },
+        },
+      });
+    }
+  } catch (e) { console.warn('Trend chart failed:', e); }
+
+  // ── Severity Donut Chart ──
+  try {
+    const defect = result.defect_result || {};
+    const crit = defect.critical_count || 0;
+    const high = defect.high_count || 0;
+    const med = defect.medium_count || 0;
+    const low = defect.low_count || 0;
+    const info = defect.info_count || 0;
+    const total = crit + high + med + low + info;
+
+    if (total > 0) {
+      chartsSection.style.display = 'grid';
+      const ctx2 = document.getElementById('severity-chart').getContext('2d');
+      _severityChart = new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+          labels: ['Critical', 'High', 'Medium', 'Low', 'Info'],
+          datasets: [{
+            data: [crit, high, med, low, info],
+            backgroundColor: ['#f66b6b', '#f3752e', '#f6ad55', '#52c97a', '#5a8a9a'],
+            borderColor: '#161616',
+            borderWidth: 3,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          cutout: '55%',
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { color: '#8a8078', font: { size: 11, family: 'Plus Jakarta Sans' }, padding: 14 },
+            },
+            tooltip: {
+              backgroundColor: '#1f1f1f',
+              titleColor: '#f0ece8',
+              bodyColor: '#f0ece8',
+              borderColor: '#2e2e2e',
+              borderWidth: 1,
+            },
+          },
+        },
+      });
+    }
+  } catch (e) { console.warn('Severity chart failed:', e); }
 }
 
 async function _loadHistory(result, intelligence) {
@@ -1640,6 +2153,16 @@ async function _fetchJson(url) {
 function _resetIntelligence() {
   ['res-app-score','res-grade','res-risk','res-trend','res-new','res-recurring','res-resolved','res-regressions']
     .forEach(id => { document.getElementById(id).textContent = '—'; });
+  // Reset hero score card
+  document.getElementById('hero-score').textContent = '—';
+  document.getElementById('hero-grade').textContent = '—';
+  document.getElementById('hero-risk').textContent = '—';
+  document.getElementById('hero-trend').textContent = '—';
+  document.getElementById('hero-issues').textContent = '—';
+  document.getElementById('grade-ring').style.borderColor = 'var(--border)';
+  document.getElementById('hero-grade').style.color = 'var(--text)';
+  document.getElementById('hero-score').style.color = 'var(--text)';
+  // Reset sections
   document.getElementById('intelligence-section').style.display = 'none';
   document.getElementById('history-section').style.display = 'none';
   document.getElementById('intelligence-banner').style.display = 'none';
@@ -1651,6 +2174,11 @@ function _resetIntelligence() {
   document.getElementById('audit-list').innerHTML = '';
   document.getElementById('event-list').innerHTML = '';
   document.getElementById('page-history-select').innerHTML = '<option value="">Select a page</option>';
+  // Reset charts and dimension
+  document.getElementById('comparison-banner').style.display = 'none';
+  document.getElementById('dimension-section').style.display = 'none';
+  document.getElementById('dimension-label').style.display = 'none';
+  document.getElementById('charts-section').style.display = 'none';
 }
 
 function cancelScan() {
