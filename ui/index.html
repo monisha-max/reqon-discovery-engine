@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ReQon — Discovery Engine</title>
+<title>ReQon Discovery Engine</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -968,7 +968,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
     <div class="hero-content">
       <p class="hero-eyebrow">Feuji · Quality Intelligence Platform</p>
       <h1 class="hero-headline">Discover. Analyze.<br><span class="accent">Fix.</span></h1>
-      <p class="hero-sub">AI-powered defect detection, performance profiling, and security scanning — in one scan.</p>
+      <p class="hero-sub">AI-powered defect detection, performance profiling, and security scanning. All in one scan.</p>
 
       <div class="hero-input-wrap">
         <input id="target-url" type="url" placeholder="https://your-app.com" autocomplete="off" spellcheck="false">
@@ -1016,7 +1016,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
   <section class="config-section">
     <div class="config-inner">
       <h2 class="config-section-title">Configure your scan</h2>
-      <p class="config-section-sub">Authentication and advanced options — all optional.</p>
+      <p class="config-section-sub">Authentication and advanced options. All optional.</p>
 
       <!-- Auth section -->
       <div class="collapsible" id="auth-section">
@@ -1068,7 +1068,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
                 <label for="session-cookies">
                   Paste session cookies from DevTools
                   <span style="color:var(--muted);font-weight:400;">
-                    — Application → Cookies → click your domain → copy Name=Value pairs
+                    then Application, Cookies, click your domain, and copy Name=Value pairs
                   </span>
                 </label>
                 <textarea id="session-cookies"
@@ -1082,7 +1082,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
                 <strong style="color:var(--success);">How to get cookies for OTP / phone login sites:</strong><br>
                 1. Open the site in Chrome and log in normally (complete OTP on your phone)<br>
                 2. Open DevTools → <strong>Application</strong> → <strong>Cookies</strong> → click your domain<br>
-                3. Find <strong>access_token</strong> (or sessionid / authToken) — double-click the Value cell to select all<br>
+                3. Find <strong>access_token</strong> (or sessionid / authToken). Double-click the Value cell to select all<br>
                 4. Paste it above as: <code style="background:#0a0a0a;padding:1px 5px;border-radius:3px;">access_token=&lt;paste value here&gt;</code><br>
                 5. Multiple cookies: separate with <code style="background:#0a0a0a;padding:1px 5px;border-radius:3px;">;</code>
               </div>
@@ -1218,7 +1218,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
           <span class="score-main" id="hero-score">—</span>
           <span class="score-max"> / 100</span>
         </div>
-        <div class="score-subtitle">Hygiene Score — overall application health across accessibility, performance, visual, functional, and security dimensions</div>
+        <div class="score-subtitle">Hygiene Score. Overall application health across accessibility, performance, visual, functional, and security dimensions.</div>
       </div>
       <div class="score-meta">
         <div class="meta-row">
@@ -1269,7 +1269,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
         <div class="stat-num" id="res-resolved">—</div>
         <div class="stat-lbl">Resolved</div>
       </div>
-      <div class="stat-mini" title="Fixed issues that came back — the most concerning">
+      <div class="stat-mini" title="Fixed issues that came back. The most concerning category.">
         <div class="stat-num" id="res-regressions">—</div>
         <div class="stat-lbl">Regressions</div>
       </div>
@@ -1291,7 +1291,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
     </div>
 
     <!-- Dimension Breakdown -->
-    <p id="dimension-label" style="display:none;font-size:0.82rem;color:var(--muted);margin-bottom:8px;">Quality scored across 6 independent dimensions. Strength in one area cannot mask weakness in another — each is evaluated separately.</p>
+    <p id="dimension-label" style="display:none;font-size:0.82rem;color:var(--muted);margin-bottom:8px;">Quality scored across 6 independent dimensions. Strength in one area cannot mask weakness in another. Each is evaluated separately.</p>
     <div id="dimension-section" class="dimension-grid" style="display:none;"></div>
 
     <!-- Charts: Trend Line + Severity Donut -->
@@ -1310,7 +1310,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
     <div class="section-block" id="intelligence-section" style="display:none;">
       <h3>Intelligence Summary</h3>
-      <p style="font-size:0.82rem;color:var(--muted);margin:-4px 0 14px;">Pages ranked by risk. The knowledge graph tracks every issue across scans — recurring and regressed issues are weighted more heavily because they indicate systemic problems.</p>
+      <p style="font-size:0.82rem;color:var(--muted);margin:-4px 0 14px;">Pages ranked by risk. The knowledge graph tracks every issue across scans. Recurring and regressed issues are weighted more heavily because they indicate systemic problems.</p>
       <div id="intelligence-banner" class="empty-state" style="display:none;margin-bottom:14px;"></div>
       <div id="priorities-list"></div>
       <div id="page-scores-table" style="margin-top:16px;"></div>
@@ -1318,7 +1318,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 
     <div class="section-block" id="history-section" style="display:none;">
       <h3>History</h3>
-      <p style="font-size:0.82rem;color:var(--muted);margin:-4px 0 14px;">Score history stored in the knowledge graph. Each scan builds on the last — the system remembers what it found and tracks whether quality is improving or declining.</p>
+      <p style="font-size:0.82rem;color:var(--muted);margin:-4px 0 14px;">Score history stored in the knowledge graph. Each scan builds on the last. The system remembers what it found and tracks whether quality is improving or declining.</p>
       <div style="margin-bottom:16px;">
         <strong style="font-size:0.85rem;color:var(--muted);">Application History</strong>
         <div id="application-history-list" style="margin-top:10px;"></div>
@@ -1677,19 +1677,19 @@ async function _renderResult(result, statusData) {
     authBanner.style.background = '#0d1f14';
     authBanner.style.border = '1px solid var(--success)';
     authBanner.style.color = 'var(--success)';
-    authBanner.innerHTML = `✓ <strong>Login successful</strong> — strategy: <code>${_esc(authStrategy)}</code>. Logged-in pages were crawled and tested.`;
+    authBanner.innerHTML = `✓ <strong>Login successful</strong> (strategy: <code>${_esc(authStrategy)}</code>). Logged-in pages were crawled and tested.`;
   } else if (authStatus === 'failed') {
     authBanner.style.display = 'block';
     authBanner.style.background = '#1e0d0d';
     authBanner.style.border = '1px solid var(--error)';
     authBanner.style.color = 'var(--error)';
-    authBanner.innerHTML = '✗ <strong>Login failed</strong> — scan ran on public pages only. Check that your cookies are valid and not expired.';
+    authBanner.innerHTML = '✗ <strong>Login failed</strong>. Scan ran on public pages only. Check that your cookies are valid and not expired.';
   } else if (authStatus === 'skipped') {
     authBanner.style.display = 'block';
     authBanner.style.background = 'var(--surface2)';
     authBanner.style.border = '1px solid var(--border)';
     authBanner.style.color = 'var(--muted)';
-    authBanner.innerHTML = '— <strong>No auth configured</strong> — only public pages were scanned.';
+    authBanner.innerHTML = '<strong>No auth configured</strong>. Only public pages were scanned.';
   } else {
     authBanner.style.display = 'none';
   }
@@ -1967,7 +1967,7 @@ function _renderDimensionBreakdown(intelligence) {
     if (hasZero && hasPerfect) {
       const noteEl = document.createElement('p');
       noteEl.style.cssText = 'font-size:0.78rem;color:var(--warn);margin:-4px 0 14px;';
-      noteEl.textContent = 'Note: Some dimensions score 0 while others score 100 — the overall Hygiene Score is dragged down by the weakest areas. Fix the red dimensions to see the biggest score improvement.';
+      noteEl.textContent = 'Note: Some dimensions score 0 while others score 100. The overall Hygiene Score is dragged down by the weakest areas. Fix the red dimensions to see the biggest score improvement.';
       dimSection.parentNode.insertBefore(noteEl, dimSection.nextSibling);
     }
   }

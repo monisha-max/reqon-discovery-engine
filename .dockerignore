@@ -1,0 +1,11 @@
+.git
+.env
+__pycache__
+*.pyc
+.venv
+venv
+output/
+.DS_Store
+.claude/
+*.md
+tests/
