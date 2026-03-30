@@ -302,6 +302,9 @@ Once the scan begins, ReQon orchestrates the full analysis pipeline:
 - detects visual and functional defects
 - collects accessibility findings and evidence
 
+![d2303992-5314-4490-8d52-530c1e8a9f44](https://github.com/user-attachments/assets/f9ded941-2b8b-4ebf-bb94-f8f833204f07)
+
+
 ## The Core Innovation: Intelligence, Not Just Scanning
 
 Traditional scanners tell you what they found in one run.
