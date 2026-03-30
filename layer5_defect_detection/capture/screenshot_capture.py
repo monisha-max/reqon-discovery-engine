@@ -101,6 +101,10 @@ class ScreenshotCapture:
         if monitor_events:
             page._reqon_console_errors: list[str] = []
             page._reqon_failed_requests: list[dict] = []
+            # {url, status, resource_type, timing_ms} for every completed response
+            page._reqon_responses: list[dict] = []
+            # track request start times keyed by request object id
+            _request_start: dict[int, float] = {}
 
             def _on_console(msg: Any) -> None:
                 if msg.type == "error":
@@ -112,8 +116,23 @@ class ScreenshotCapture:
                     "failure_text": request.failure or "unknown",
                 })
 
+            def _on_request(request: Any) -> None:
+                _request_start[id(request)] = time.time()
+
+            def _on_response(response: Any) -> None:
+                start = _request_start.pop(id(response.request), None)
+                timing_ms = round((time.time() - start) * 1000) if start else None
+                page._reqon_responses.append({
+                    "url": response.url,
+                    "status": response.status,
+                    "resource_type": response.request.resource_type,
+                    "timing_ms": timing_ms,
+                })
+
             page.on("console", _on_console)
             page.on("requestfailed", _on_requestfailed)
+            page.on("request", _on_request)
+            page.on("response", _on_response)
 
         try:
             await page.goto(nav_url, wait_until="networkidle", timeout=30_000)

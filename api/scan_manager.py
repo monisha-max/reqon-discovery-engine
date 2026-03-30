@@ -254,9 +254,14 @@ async def run_scan(scan_id: str) -> None:
                 scan_id=scan_id,
                 error=str(exc),
             )
+            _exc_str = str(exc)
+            if "No module named" in _exc_str or "neo4j" in _exc_str.lower():
+                _friendly = "Intelligence layer unavailable (Neo4j not configured). Historical scoring and trend data require a connected Neo4j instance."
+            else:
+                _friendly = "Intelligence layer temporarily unavailable."
             record.result["intelligence"] = {
                 "status": "degraded",
-                "error_message": str(exc),
+                "error_message": _friendly,
                 "application_score": None,
                 "page_scores": [],
                 "lifecycle_summary": None,

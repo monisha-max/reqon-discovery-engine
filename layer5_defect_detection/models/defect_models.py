@@ -26,6 +26,19 @@ class DefectCategory(str, Enum):
     BROKEN_LINK = "broken_link"
     CONSOLE_ERROR = "console_error"
     NETWORK_FAILURE = "network_failure"
+    # DOM behavioral checks
+    DOM_STRUCTURAL = "dom_structural"       # Heading hierarchy, duplicate IDs
+    FORM_INTEGRITY = "form_integrity"       # Missing labels, missing submit button
+    ARIA_VIOLATION = "aria_violation"       # Broken ARIA patterns
+    EMPTY_INTERACTIVE = "empty_interactive" # Buttons/links with no accessible label
+    MISSING_ALT_TEXT = "missing_alt_text"   # Content images without alt text
+    STATE_ANOMALY = "state_anomaly"         # Stuck spinners, visible error states
+    EMPTY_CONTAINER = "empty_container"     # Empty tables/lists that should have data
+    # Network telemetry
+    SLOW_ENDPOINT = "slow_endpoint"         # Requests exceeding latency thresholds
+    REQUEST_RETRY = "request_retry"         # Same URL fetched 3+ times (flakiness)
+    AUTH_FAILURE = "auth_failure"           # Mid-session 401/403 on XHR/API calls
+    SECURITY_HYGIENE = "security_hygiene"   # CSP violations, mixed content, CORS blocks
 
 
 class BoundingBox(BaseModel):

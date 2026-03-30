@@ -38,7 +38,7 @@ class EvidenceBuilder:
     def build_html_report(self, result: DefectDetectionResult, run_id: str) -> str:
         path = os.path.join(self.output_dir, f"defect_report_{run_id}.html")
         os.makedirs(self.output_dir, exist_ok=True)
-        html = _render_html(result, run_id)
+        html = _render_html(result, run_id, report_path=path)
         with open(path, "w", encoding="utf-8") as f:
             f.write(html)
         return path
@@ -64,7 +64,7 @@ class EvidenceBuilder:
         return path
 
 
-def _render_html(result: DefectDetectionResult, run_id: str) -> str:
+def _render_html(result: DefectDetectionResult, run_id: str, report_path: str = "") -> str:
     ts = result.timestamp or datetime.now(timezone.utc).isoformat()
 
     # Summary bar
@@ -104,13 +104,17 @@ def _render_html(result: DefectDetectionResult, run_id: str) -> str:
 
         for snapshot in page_summary.snapshots:
             ann_path = snapshot.annotated_screenshot_path or snapshot.screenshot_path
-            # Make path relative for HTML display
-            rel_path = os.path.relpath(ann_path, os.path.dirname(result.report_path)) if ann_path else ""
+            rel_path = os.path.relpath(ann_path, os.path.dirname(report_path)) if ann_path and report_path else (ann_path or "")
             rel_path = rel_path.replace("\\", "/")
+            finding_count = len(snapshot.findings)
+            badge_color = "#dc2626" if finding_count > 5 else "#ea580c" if finding_count > 0 else "#16a34a"
             pages_html += f"""
-                <div class="snapshot">
-                    <h3>{snapshot.phase.upper()} ({len(snapshot.findings)} findings)</h3>
+                <div class="snapshot" onclick="openLightbox('{rel_path}', '{snapshot.phase.upper()} — {len(snapshot.findings)} findings')">
                     <img src="{rel_path}" alt="{snapshot.phase} screenshot" loading="lazy">
+                    <div class="snap-label">
+                        <span>{snapshot.phase.upper()}</span>
+                        <span class="snap-badge" style="background:{badge_color}">{finding_count} findings</span>
+                    </div>
                 </div>
             """
 
@@ -162,7 +166,7 @@ def _render_html(result: DefectDetectionResult, run_id: str) -> str:
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Defect Detection Report — {run_id}</title>
+<title>Defect Detection Report &mdash; {run_id}</title>
 <style>
   body {{ font-family: system-ui, sans-serif; margin: 0; padding: 20px; background: #f8fafc; color: #1e293b; }}
   h1   {{ color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }}
@@ -180,9 +184,29 @@ def _render_html(result: DefectDetectionResult, run_id: str) -> str:
   .badge.info     {{ background:#2563eb;color:#fff }}
   .page-section {{ background:#fff; border:1px solid #e2e8f0; border-radius:8px;
                    padding:20px; margin:20px 0; }}
-  .screenshots  {{ display:flex; gap:16px; flex-wrap:wrap; margin:16px 0; }}
-  .snapshot     {{ flex:1; min-width:300px; }}
-  .snapshot img {{ width:100%; border:1px solid #cbd5e1; border-radius:4px; }}
+  /* Screenshot thumbnail gallery */
+  .screenshots  {{ display:flex; gap:12px; flex-wrap:wrap; margin:16px 0; }}
+  .snapshot     {{ width:220px; cursor:pointer; border:1px solid #e2e8f0; border-radius:8px;
+                   overflow:hidden; transition:box-shadow .15s;
+                   background:#f1f5f9; flex-shrink:0; }}
+  .snapshot:hover {{ box-shadow:0 4px 16px rgba(0,0,0,.15); border-color:#94a3b8; }}
+  .snapshot img {{ width:100%; height:140px; object-fit:cover; object-position:top;
+                   display:block; border-bottom:1px solid #e2e8f0; }}
+  .snap-label   {{ display:flex; justify-content:space-between; align-items:center;
+                   padding:6px 10px; font-size:12px; font-weight:600; color:#374151; }}
+  .snap-badge   {{ color:#fff; padding:2px 7px; border-radius:10px; font-size:11px; }}
+  /* Lightbox */
+  #lb-overlay   {{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.85);
+                   z-index:9999; align-items:center; justify-content:center;
+                   flex-direction:column; gap:12px; }}
+  #lb-overlay.open {{ display:flex; }}
+  #lb-img       {{ max-width:92vw; max-height:82vh; border-radius:6px;
+                   box-shadow:0 8px 40px rgba(0,0,0,.6); object-fit:contain; }}
+  #lb-caption   {{ color:#e2e8f0; font-size:14px; font-weight:500; }}
+  #lb-close     {{ position:fixed; top:16px; right:24px; color:#fff; font-size:32px;
+                   cursor:pointer; line-height:1; background:none; border:none; }}
+  #lb-open-btn  {{ color:#60a5fa; font-size:13px; cursor:pointer;
+                   background:none; border:none; text-decoration:underline; }}
   table {{ width:100%; border-collapse:collapse; margin:16px 0; font-size:13px; }}
   th    {{ background:#f1f5f9; text-align:left; padding:8px; border-bottom:2px solid #e2e8f0; }}
   td    {{ padding:6px 8px; border-bottom:1px solid #f1f5f9; vertical-align:top; }}
@@ -194,11 +218,42 @@ def _render_html(result: DefectDetectionResult, run_id: str) -> str:
 </style>
 </head>
 <body>
+
+<!-- Lightbox overlay -->
+<div id="lb-overlay" onclick="closeLightbox(event)">
+  <button id="lb-close" onclick="closeLightbox()">&times;</button>
+  <img id="lb-img" src="" alt="">
+  <div id="lb-caption"></div>
+  <button id="lb-open-btn" onclick="openInTab()">Open full-size in new tab &rarr;</button>
+</div>
+
 <h1>Defect Detection Report</h1>
 <p><strong>Target:</strong> {result.target_url} &nbsp;|&nbsp;
    <strong>Run ID:</strong> {run_id} &nbsp;|&nbsp;
    <strong>Generated:</strong> {ts}</p>
 {summary_html}
 {pages_html}
+
+<script>
+  var _lbSrc = '';
+  function openLightbox(src, caption) {{
+    _lbSrc = src;
+    document.getElementById('lb-img').src = src;
+    document.getElementById('lb-caption').textContent = caption;
+    document.getElementById('lb-overlay').classList.add('open');
+  }}
+  function closeLightbox(e) {{
+    if (!e || e.target === document.getElementById('lb-overlay') || e.target.id === 'lb-close') {{
+      document.getElementById('lb-overlay').classList.remove('open');
+      document.getElementById('lb-img').src = '';
+    }}
+  }}
+  function openInTab() {{
+    window.open(_lbSrc, '_blank');
+  }}
+  document.addEventListener('keydown', function(e) {{
+    if (e.key === 'Escape') closeLightbox();
+  }});
+</script>
 </body>
 </html>"""

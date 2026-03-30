@@ -25,6 +25,7 @@ from typing import Optional
 import structlog
 
 from layer5_defect_detection.analyzers.contrast_analyzer import ContrastAnalyzer
+from layer5_defect_detection.analyzers.dom_behavioral_analyzer import DOMBehavioralAnalyzer
 from layer5_defect_detection.analyzers.functional_analyzer import FunctionalAnalyzer
 from layer5_defect_detection.analyzers.layout_analyzer import LayoutAnalyzer
 
@@ -97,6 +98,7 @@ async def run_defect_detection(
     layout_analyzer = LayoutAnalyzer()
     contrast_analyzer = ContrastAnalyzer()
     functional_analyzer = FunctionalAnalyzer()
+    dom_behavioral_analyzer = DOMBehavioralAnalyzer()
     mapper = FindingsMapper()
     annotator = Annotator()
     builder = EvidenceBuilder(run_dir)
@@ -161,11 +163,19 @@ async def run_defect_detection(
                     raw_findings.extend(
                         await functional_analyzer.check_broken_links(page, phase)
                     )
-                    # Console errors / network failures captured pre-navigation
+                    raw_findings.extend(
+                        await dom_behavioral_analyzer.analyze(page, phase)
+                    )
+                    # Console errors / network failures / response telemetry
+                    # — all captured pre-navigation via event listeners
                     console_errors = getattr(page, "_reqon_console_errors", [])
                     failed_requests = getattr(page, "_reqon_failed_requests", [])
+                    responses = getattr(page, "_reqon_responses", [])
                     raw_findings.extend(
                         functional_analyzer.check_events(console_errors, failed_requests, phase)
+                    )
+                    raw_findings.extend(
+                        functional_analyzer.check_network_telemetry(responses, phase)
                     )
                 finally:
                     await page.close()
